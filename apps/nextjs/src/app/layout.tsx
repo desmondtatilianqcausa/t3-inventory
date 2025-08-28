@@ -1,14 +1,14 @@
-import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-
-import { cn } from "@acme/ui";
-import { ThemeProvider, ThemeToggle } from "@acme/ui/theme";
-import { Toaster } from "@acme/ui/toast";
-
-import { TRPCReactProvider } from "~/trpc/react";
-
 import "~/app/globals.css";
+import "maplibre-gl/dist/maplibre-gl.css";
 
+import { Geist, Geist_Mono } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { ThemeProvider, ThemeToggle } from "@acme/ui/theme";
+
+import { ConvexClientProvider } from "~/convex/Provider";
+import { TRPCReactProvider } from "~/trpc/react";
+import { Toaster } from "@acme/ui/toast";
+import { cn } from "@acme/ui";
 import { env } from "~/env";
 
 export const metadata: Metadata = {
@@ -59,7 +59,9 @@ export default function RootLayout(props: { children: React.ReactNode }) {
         )}
       >
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <TRPCReactProvider>{props.children}</TRPCReactProvider>
+          <TRPCReactProvider>
+            <ConvexClientProvider>{props.children}</ConvexClientProvider>
+          </TRPCReactProvider>
           <div className="absolute bottom-4 right-4">
             <ThemeToggle />
           </div>

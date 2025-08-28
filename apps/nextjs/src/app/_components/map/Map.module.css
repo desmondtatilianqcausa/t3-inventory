@@ -1,0 +1,89 @@
+.pin {
+  --marker-color: #ef4444;
+  position: relative;
+  width: 28px;
+  height: 36px;
+  color: var(--marker-color);
+  animation: soft-bounce 1600ms ease-in-out infinite alternate;
+  transition:
+    transform 200ms ease,
+    filter 200ms ease;
+  will-change: transform;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.18))
+    drop-shadow(0 2px 4px rgba(0, 0, 0, 0.12));
+}
+
+.pin:hover {
+  animation-play-state: paused;
+  transform: translateY(0) scale(1.03);
+  filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.22))
+    drop-shadow(0 3px 6px rgba(0, 0, 0, 0.16));
+}
+
+.pin svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.pin::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -4px;
+  width: 18px;
+  height: 6px;
+  transform: translateX(-50%);
+  border-radius: 9999px;
+  background: rgba(0, 0, 0, 0.12);
+  filter: blur(2px);
+}
+
+@keyframes soft-bounce {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    transform: translateY(-6px) scale(1.02);
+  }
+}
+
+/* Existing circle marker kept for reference */
+.marker {
+  --marker-color: #ef4444;
+  position: relative;
+  width: 18px;
+  height: 18px;
+  background: var(--marker-color);
+  border-radius: 9999px;
+  box-shadow:
+    0 8px 16px rgba(0, 0, 0, 0.18),
+    0 2px 6px rgba(0, 0, 0, 0.12);
+  transform: translateY(0) scale(1);
+  animation: soft-bounce 1600ms ease-in-out infinite alternate;
+  transition:
+    transform 200ms ease,
+    box-shadow 200ms ease;
+  will-change: transform;
+}
+
+.marker:hover {
+  animation-play-state: paused;
+  transform: translateY(0) scale(1.05);
+  box-shadow:
+    0 10px 18px rgba(0, 0, 0, 0.22),
+    0 3px 8px rgba(0, 0, 0, 0.16);
+}
+
+.marker::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  width: 14px;
+  height: 6px;
+  transform: translateX(-50%);
+  border-radius: 9999px;
+  background: rgba(0, 0, 0, 0.12);
+  filter: blur(2px);
+}
