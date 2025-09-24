@@ -1,5 +1,5 @@
-import { createJiti } from "jiti";
 import path from "path";
+import { createJiti } from "jiti";
 
 const jiti = createJiti(import.meta.url);
 
@@ -21,19 +21,7 @@ const config = {
   /** We already do linting and typechecking as separate tasks in CI */
   eslint: { ignoreDuringBuilds: true },
   typescript: { ignoreBuildErrors: true },
-  webpack: (config) => {
-    const { TsconfigPathsPlugin } = require("tsconfig-paths-webpack-plugin");
-    config.resolve.plugins = config.resolve.plugins || [];
-    config.resolve.plugins.push(
-      new TsconfigPathsPlugin({
-        configFile: path.resolve(
-          __dirname,
-          "../../packages/activepieces-ui/tsconfig.json",
-        ),
-      }),
-    );
-    return config;
-  },
+
   images: {
     remotePatterns: [
       {

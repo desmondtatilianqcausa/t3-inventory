@@ -1,3 +1,8 @@
+import { authTables } from "@convex-dev/auth/server";
+import { defineSchema } from "convex/server";
+
+import { events } from "./events/schema";
+import { formResponses } from "./formResponses/schema";
 import { integrationConnections, integrations } from "./integrations/schema";
 import { orderLineItems, orders } from "./orders/schema";
 import { productCategories, products } from "./products/schema";
@@ -9,12 +14,6 @@ import {
   workflows,
 } from "./workflows/schema";
 
-import { authTables } from "@convex-dev/auth/server";
-import { defineSchema } from "convex/server";
-import { events } from "./events/schema";
-import { formResponses } from "./formResponses/schema";
-import { logs } from "./logs/schema";
-
 export default defineSchema({
   ...authTables,
   users,
@@ -22,7 +21,7 @@ export default defineSchema({
   formResponses,
   products,
   productCategories,
-  logs,
+
   orders,
   orderLineItems,
   events,
