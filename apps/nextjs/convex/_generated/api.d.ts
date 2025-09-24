@@ -16,6 +16,8 @@ import type {
 import type * as categories from "../categories.js";
 import type * as events from "../events.js";
 import type * as init from "../init.js";
+import type * as logs_mutations from "../logs/mutations.js";
+import type * as logs_queries from "../logs/queries.js";
 
 /**
  * A utility for referencing Convex functions in your app's API.
@@ -29,6 +31,8 @@ declare const fullApi: ApiFromModules<{
   categories: typeof categories;
   events: typeof events;
   init: typeof init;
+  "logs/mutations": typeof logs_mutations;
+  "logs/queries": typeof logs_queries;
 }>;
 export declare const api: FilterApi<
   typeof fullApi,
