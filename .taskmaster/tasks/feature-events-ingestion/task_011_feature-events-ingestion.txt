@@ -1,0 +1,211 @@
+# Task ID: 11
+# Title: Implement Reddit Adapter
+# Status: pending
+# Dependencies: 10
+# Priority: medium
+# Description: Create a domain-specific adapter for extracting events from Reddit posts.
+# Details:
+Implement a Reddit-specific adapter:
+
+1. Create configuration for old/new Reddit variants
+2. Implement post body selectors and parsing
+3. Add day-section splitting for multi-event posts
+4. Handle Reddit-specific date formats
+
+Example implementation:
+```yaml
+# adapters/reddit.yaml
+name: Reddit
+description: Adapter for Reddit posts (old and new variants)
+
+selectors:
+  # Old Reddit
+  old_post_body: '.usertext-body .md'
+  # New Reddit
+  new_post_body: '.RichTextJSON-root'
+  
+  # Common selectors
+  event_section: 'p, h3, h4'
+
+date_formats:
+  - '%A, %B %d'
+  - '%m/%d'
+  - '%B %d'
+  - '%b %d'
+
+time_regex:
+  - '\d{1,2}(?::\d{2})?\s*(?:AM|PM|am|pm)'
+  - '\d{1,2}(?::\d{2})?\s*-\s*\d{1,2}(?::\d{2})?\s*(?:AM|PM|am|pm)'
+```
+
+```python
+# adapters/reddit.py
+from typing import List, Dict, Any
+import re
+import dateparser
+from datetime import datetime, timedelta
+from bs4 import BeautifulSoup
+from .base import BaseAdapter
+
+class RedditAdapter(BaseAdapter):
+    def extract_events(self, url: str, html_content: str) -> List[Dict[str, Any]]:
+        """Extract events from Reddit posts"""
+        events = []
+        soup = BeautifulSoup(html_content, 'html.parser')
+        
+        # Determine if old or new Reddit
+        post_body = None
+        old_body = soup.select_one(self.selectors.get('old_post_body'))
+        new_body = soup.select_one(self.selectors.get('new_post_body'))
+        
+        if old_body:
+            post_body = old_body
+        elif new_body:
+            post_body = new_body
+        else:
+            return []
+        
+        # Get post title
+        post_title = ''
+        title_elem = soup.select_one('h1')
+        if title_elem:
+            post_title = title_elem.get_text(strip=True)
+        
+        # Extract sections that might contain events
+        sections = post_body.select(self.selectors.get('event_section'))
+        
+        # Process sections to find events
+        current_date = None
+        current_events = []
+        
+        for section in sections:
+            text = section.get_text(strip=True)
+            
+            # Skip empty sections
+            if not text:
+                continue
+            
+            # Check if this is a date header
+            date_match = self._is_date_header(text)
+            if date_match:
+                # Process any pending events with the previous date
+                if current_date and current_events:
+                    for event_text in current_events:
+                        event = self._parse_event(event_text, current_date, post_title, url)
+                        if event:
+                            events.append(event)
+                
+                # Set new current date and reset events
+                current_date = date_match
+                current_events = []
+                continue
+            
+            # Check if this section contains time information
+            if self._contains_time(text):
+                current_events.append(text)
+        
+        # Process any remaining events
+        if current_date and current_events:
+            for event_text in current_events:
+                event = self._parse_event(event_text, current_date, post_title, url)
+                if event:
+                    events.append(event)
+        
+        return events
+    
+    def _is_date_header(self, text: str) -> Optional[datetime]:
+        """Check if text is a date header and parse the date"""
+        # Try configured date formats
+        for date_format in self.config.get('date_formats', []):
+            try:
+                # Add current year since Reddit posts often omit it
+                current_year = datetime.now().year
+                date_with_year = f"{text}, {current_year}"
+                date = datetime.strptime(date_with_year, f"{date_format}, %Y")
+                
+                # If the date is in the past by more than a month, it's probably next year
+                if date < datetime.now() - timedelta(days=30):
+                    date = date.replace(year=current_year + 1)
+                
+                return date
+            except ValueError:
+                continue
+        
+        # Try with dateparser as fallback
+        date = dateparser.parse(text)
+        if date:
+            # Check if this is likely a date header (contains only date info)
+            if len(text) < 20 and not self._contains_time(text):
+                return date
+        
+        return None
+    
+    def _contains_time(self, text: str) -> bool:
+        """Check if text contains time information"""
+        for pattern in self.config.get('time_regex', []):
+            if re.search(pattern, text):
+                return True
+        return False
+    
+    def _parse_event(self, text: str, date: datetime, post_title: str, url: str) -> Optional[Dict[str, Any]]:
+        """Parse event details from text"""
+        # Extract time
+        time_match = None
+        for pattern in self.config.get('time_regex', []):
+            match = re.search(pattern, text)
+            if match:
+                time_match = match.group(0)
+                break
+        
+        if not time_match:
+            return None
+        
+        # Extract title - first sentence or whole text if short
+        title_text = text.split('.')[0] if '.' in text else text
+        title_text = title_text[:100] + ('...' if len(title_text) > 100 else '')
+        
+        # Create event
+        event = {
+            'title': title_text,
+            'description': text,
+            'url': url,
+            'startDate': self._combine_date_time(date, time_match).isoformat()
+        }
+        
+        # Try to extract venue
+        venue_match = re.search(r'at\s+([^,\.]+)', text)
+        if venue_match:
+            event['venue'] = venue_match.group(1).strip()
+        
+        return event
+    
+    def _combine_date_time(self, date: datetime, time_str: str) -> datetime:
+        """Combine date and time string into datetime"""
+        # Parse time
+        time_parts = re.search(r'(\d{1,2})(?::(\d{2}))?\s*(AM|PM|am|pm)', time_str)
+        if time_parts:
+            hour = int(time_parts.group(1))
+            minute = int(time_parts.group(2) or '0')
+            ampm = time_parts.group(3).upper()
+            
+            # Convert to 24-hour
+            if ampm == 'PM' and hour < 12:
+                hour += 12
+            elif ampm == 'AM' and hour == 12:
+                hour = 0
+            
+            # Combine with date
+            return date.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        
+        # Fallback to noon if time parsing fails
+        return date.replace(hour=12, minute=0, second=0, microsecond=0)
+```
+
+# Test Strategy:
+1. Unit tests for Reddit adapter with sample HTML content
+2. Test date header detection with various formats
+3. Test time extraction with different patterns
+4. Test event parsing from multi-event posts
+5. Test with both old and new Reddit HTML structures
+6. Integration tests with real Reddit URLs
+7. Test edge cases like missing dates or ambiguous formats

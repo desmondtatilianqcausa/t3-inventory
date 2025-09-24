@@ -19,7 +19,7 @@
     "format:fix": "turbo run format --continue -- --write --cache --cache-location .cache/.prettiercache",
     "lint": "turbo run lint --continue -- --cache --cache-location .cache/.eslintcache",
     "lint:fix": "turbo run lint --continue -- --fix --cache --cache-location .cache/.eslintcache",
-    "lint:ws": "pnpm dlx sherif@latest",
+    "lint:ws": "pnpm dlx sherif@latest -f",
     "postinstall": "pnpm lint:ws",
     "typecheck": "turbo run typecheck",
     "ui-add": "turbo run ui-add",
@@ -28,8 +28,13 @@
   },
   "devDependencies": {
     "@acme/prettier-config": "workspace:*",
+    "@swc/cli": "0.6.0",
+    "@swc/core": "1.5.7",
     "@turbo/gen": "^2.5.4",
+    "cpy": "^12.0.1",
+    "cpy-cli": "^6.0.0",
     "prettier": "catalog:",
+    "tsc-alias": "^1.8.16",
     "turbo": "^2.5.4",
     "typescript": "catalog:"
   },

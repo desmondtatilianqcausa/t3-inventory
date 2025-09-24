@@ -1,0 +1,66 @@
+# Task ID: 8
+# Title: Implement Map Component with Restricted Behavior
+# Status: pending
+# Dependencies: 7
+# Priority: medium
+# Description: Create a map component with a single marker and restricted zoom/interaction behavior.
+# Details:
+Use Mapbox GL JS or a similar library to implement a map component with the following features:
+- Single marker at the event venue location
+- Restricted zoom range (minZoom ~16, maxZoom ~18)
+- Disabled rotation on mobile
+- Disabled scroll zoom on small screens
+- Center offset to keep marker visible beside sidebar
+
+```tsx
+import { useRef, useEffect } from 'react';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
+
+const EventMap = ({ event }) => {
+  const mapContainer = useRef(null);
+  const map = useRef(null);
+  
+  useEffect(() => {
+    if (!event.latitude || !event.longitude) return;
+    
+    mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+    
+    if (map.current) return;
+    
+    // Calculate offset for desktop to keep marker visible beside sidebar
+    const isMobile = window.innerWidth < 768;
+    const offset = isMobile ? [0, 0] : [-150, 0];
+    
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: 'mapbox://styles/mapbox/streets-v11',
+      center: [event.longitude, event.latitude],
+      zoom: 16,
+      minZoom: 15,
+      maxZoom: 18,
+      dragRotate: !isMobile,
+      scrollZoom: !isMobile,
+      offset: offset
+    });
+    
+    const marker = new mapboxgl.Marker()
+      .setLngLat([event.longitude, event.latitude])
+      .addTo(map.current);
+      
+    // Add navigation controls
+    map.current.addControl(new mapboxgl.NavigationControl());
+    
+    return () => map.current?.remove();
+  }, [event]);
+  
+  return (
+    <div className="h-64 w-full rounded-lg overflow-hidden" ref={mapContainer} />
+  );
+};
+```
+
+Lazy-load the map component to improve initial page load performance.
+
+# Test Strategy:
+Test the map on both desktop and mobile devices to verify zoom restrictions and interaction behaviors. Ensure the marker is correctly positioned and visible. Test with various venue locations. Verify that the map is lazy-loaded correctly.

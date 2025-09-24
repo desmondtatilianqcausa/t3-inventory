@@ -1,0 +1,76 @@
+# Task ID: 6
+# Title: Implement SEO Metadata and JSON-LD Schema
+# Status: pending
+# Dependencies: 5
+# Priority: high
+# Description: Add SEO metadata and structured data to the event page for better search engine visibility.
+# Details:
+Implement the `generateMetadata` function in the event page to provide SEO metadata:
+```typescript
+export async function generateMetadata({ params }) {
+  const event = await getEventBySlug(params.slug);
+  
+  return {
+    title: event.title,
+    description: event.description,
+    openGraph: {
+      title: event.title,
+      description: event.description,
+      images: [event.images[0]],
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: event.title,
+      description: event.description,
+      images: [event.images[0]],
+    },
+    alternates: {
+      canonical: `https://yourdomain.com/event/${event.slug}`,
+    },
+  };
+}
+```
+
+Add JSON-LD structured data for the event:
+```typescript
+function EventJsonLd({ event }) {
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Event',
+    name: event.title,
+    startDate: new Date(event.startAt).toISOString(),
+    endDate: new Date(event.endAt).toISOString(),
+    location: {
+      '@type': 'Place',
+      name: event.venue,
+      address: {
+        '@type': 'PostalAddress',
+        streetAddress: event.address,
+        addressLocality: event.city,
+        addressRegion: event.state,
+      },
+    },
+    image: event.images[0],
+    description: event.description,
+    url: `https://yourdomain.com/event/${event.slug}`,
+    offers: event.ticketUrl ? {
+      '@type': 'Offer',
+      url: event.ticketUrl,
+      price: event.price,
+      priceCurrency: 'USD',
+      availability: event.isSoldOut ? 'SoldOut' : 'InStock',
+    } : undefined,
+  };
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+    />
+  );
+}
+```
+
+# Test Strategy:
+Use tools like Google's Structured Data Testing Tool and Facebook's Sharing Debugger to verify the metadata and JSON-LD schema. Test with various event data to ensure all fields are correctly populated. Verify that the canonical URL is correctly set.

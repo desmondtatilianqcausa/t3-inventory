@@ -1,0 +1,47 @@
+# Task ID: 4
+# Title: Implement Convex Query for Related Events
+# Status: pending
+# Dependencies: 1
+# Priority: medium
+# Description: Create a query to fetch related events based on category and date range.
+# Details:
+Implement `events.related` query that:
+- Accepts eventId parameter
+- Fetches the specified event to get its category and date
+- Finds events with the same category and similar date range (within ±7 days)
+- Excludes the original event from results
+- Limits results to 3-5 events
+- Orders by proximity to the original event's date
+
+Example implementation:
+```typescript
+export const related = query({
+  args: { eventId: v.id('events') },
+  handler: async (ctx, args) => {
+    const event = await ctx.db.get(args.eventId);
+    if (!event) throw new Error('Event not found');
+    
+    const startDate = new Date(event.startAt);
+    const minDate = new Date(startDate);
+    minDate.setDate(minDate.getDate() - 7);
+    const maxDate = new Date(startDate);
+    maxDate.setDate(maxDate.getDate() + 7);
+    
+    return await ctx.db
+      .query('events')
+      .withIndex('by_category', q => q.eq('category', event.category))
+      .filter(q => 
+        q.and(
+          q.gt('startAt', minDate.getTime()),
+          q.lt('startAt', maxDate.getTime()),
+          q.neq('_id', event._id)
+        )
+      )
+      .order('asc')
+      .take(4);
+  },
+});
+```
+
+# Test Strategy:
+Test the related events query with various event categories and dates. Verify that it returns events in the same category within the expected date range. Check that the original event is excluded from results. Test edge cases like events with no related events.

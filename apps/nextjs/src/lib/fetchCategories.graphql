@@ -1,0 +1,8 @@
+query FetchCategories {
+  boards(ids: 5798486455) {
+    groups {
+      title
+      id
+    }
+  }
+}

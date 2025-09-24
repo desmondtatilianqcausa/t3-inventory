@@ -1,0 +1,200 @@
+# Task ID: 14
+# Title: Implement Facebook Public Pages Adapter
+# Status: pending
+# Dependencies: 10
+# Priority: medium
+# Description: Create a domain-specific adapter for extracting events from Facebook public pages and events.
+# Details:
+Implement a Facebook-specific adapter:
+
+1. Create configuration for Facebook public pages and events
+2. Implement headless browser fetching with Playwright
+3. Add content selectors for event extraction
+4. Handle Facebook-specific date formats and structures
+
+Example implementation:
+```yaml
+# adapters/facebook.yaml
+name: Facebook
+description: Adapter for Facebook public pages and events
+
+# Requires headless browser
+requires_headless: true
+
+selectors:
+  # Event page selectors
+  event_title: 'h1[data-testid="event-permalink-title"]'
+  event_date: 'span[data-testid="event_permalink_feature_line"]'
+  event_location: 'div[data-testid="event_permalink_feature_line"] span'
+  event_description: 'div[data-testid="event-permalink-details"]'
+  event_image: 'img[data-imgperflogname="profileCoverPhoto"]'
+  
+  # Events list selectors
+  events_container: 'div[role="main"] > div > div > div'
+  event_card: 'div[role="button"]'
+  card_title: 'span[dir="auto"]'
+  card_date: 'span[dir="auto"]:nth-child(2)'
+  card_location: 'span[dir="auto"]:nth-child(3)'
+
+date_formats:
+  - '%A, %B %d, %Y at %I:%M %p'
+  - '%A, %B %d at %I:%M %p'
+```
+
+```python
+# adapters/facebook.py
+from typing import List, Dict, Any, Optional
+import re
+from datetime import datetime
+from bs4 import BeautifulSoup
+import dateparser
+from .base import BaseAdapter
+
+class FacebookAdapter(BaseAdapter):
+    def extract_events(self, url: str, html_content: str) -> List[Dict[str, Any]]:
+        """Extract events from Facebook pages"""
+        events = []
+        soup = BeautifulSoup(html_content, 'html.parser')
+        
+        # Check if this is an event page or events listing
+        if '/events/' in url and not url.endswith('/events/'):
+            # Single event page
+            event = self._extract_single_event(soup, url)
+            if event:
+                events.append(event)
+        else:
+            # Events listing page
+            listing_events = self._extract_events_listing(soup, url)
+            events.extend(listing_events)
+        
+        return events
+    
+    def _extract_single_event(self, soup: BeautifulSoup, url: str) -> Optional[Dict[str, Any]]:
+        """Extract data from a single event page"""
+        event = {'url': url}
+        
+        # Extract title
+        title_elem = soup.select_one(self.selectors.get('event_title'))
+        if title_elem:
+            event['title'] = title_elem.get_text(strip=True)
+        else:
+            # Title is required
+            return None
+        
+        # Extract date
+        date_elem = soup.select_one(self.selectors.get('event_date'))
+        if date_elem:
+            date_text = date_elem.get_text(strip=True)
+            date = self._parse_facebook_date(date_text)
+            if date:
+                event['startDate'] = date.isoformat()
+        
+        # Extract location
+        location_elem = soup.select_one(self.selectors.get('event_location'))
+        if location_elem:
+            location_text = location_elem.get_text(strip=True)
+            
+            # Try to separate venue and address
+            if ' · ' in location_text:
+                parts = location_text.split(' · ')
+                event['venue'] = parts[0].strip()
+                if len(parts) > 1:
+                    event['address'] = parts[1].strip()
+            else:
+                event['venue'] = location_text
+        
+        # Extract description
+        desc_elem = soup.select_one(self.selectors.get('event_description'))
+        if desc_elem:
+            event['description'] = desc_elem.get_text(strip=True)
+        
+        # Extract image
+        img_elem = soup.select_one(self.selectors.get('event_image'))
+        if img_elem and img_elem.get('src'):
+            event['imageUrl'] = img_elem['src']
+        
+        return event
+    
+    def _extract_events_listing(self, soup: BeautifulSoup, base_url: str) -> List[Dict[str, Any]]:
+        """Extract events from a listing page"""
+        events = []
+        container = soup.select_one(self.selectors.get('events_container'))
+        
+        if not container:
+            return []
+        
+        # Find event cards
+        cards = container.select(self.selectors.get('event_card'))
+        
+        for card in cards:
+            event = {}
+            
+            # Extract title
+            title_elem = card.select_one(self.selectors.get('card_title'))
+            if title_elem:
+                event['title'] = title_elem.get_text(strip=True)
+            else:
+                continue  # Skip if no title
+            
+            # Extract date
+            date_elem = card.select_one(self.selectors.get('card_date'))
+            if date_elem:
+                date_text = date_elem.get_text(strip=True)
+                date = self._parse_facebook_date(date_text)
+                if date:
+                    event['startDate'] = date.isoformat()
+            
+            # Extract location
+            location_elem = card.select_one(self.selectors.get('card_location'))
+            if location_elem:
+                event['venue'] = location_elem.get_text(strip=True)
+            
+            # Extract URL if available
+            link = card.find('a')
+            if link and link.get('href'):
+                href = link['href']
+                if href.startswith('/'):
+                    event['url'] = f"https://www.facebook.com{href}"
+                else:
+                    event['url'] = href
+            
+            if 'title' in event:  # Only add if we have at least a title
+                events.append(event)
+        
+        return events
+    
+    def _parse_facebook_date(self, date_text: str) -> Optional[datetime]:
+        """Parse Facebook date formats"""
+        # Try configured date formats
+        for date_format in self.config.get('date_formats', []):
+            try:
+                return datetime.strptime(date_text, date_format)
+            except ValueError:
+                continue
+        
+        # Handle relative dates (e.g., "Tomorrow at 7 PM")
+        if 'tomorrow' in date_text.lower():
+            time_match = re.search(r'(\d{1,2}:\d{2}|\d{1,2})\s*(am|pm)', date_text.lower())
+            if time_match:
+                time_str = f"tomorrow at {time_match.group(0)}"
+                return dateparser.parse(time_str)
+        
+        # Handle "Today at X" format
+        if 'today' in date_text.lower():
+            time_match = re.search(r'(\d{1,2}:\d{2}|\d{1,2})\s*(am|pm)', date_text.lower())
+            if time_match:
+                time_str = f"today at {time_match.group(0)}"
+                return dateparser.parse(time_str)
+        
+        # Fallback to dateparser
+        return dateparser.parse(date_text)
+```
+
+# Test Strategy:
+1. Unit tests for Facebook adapter with sample HTML content
+2. Test single event page extraction
+3. Test events listing extraction
+4. Test date parsing with Facebook-specific formats
+5. Test with headless browser integration
+6. Integration tests with real Facebook public URLs
+7. Test error handling for rate limiting and access restrictions

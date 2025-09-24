@@ -1,0 +1,89 @@
+# Task ID: 5
+# Title: Implement Deduplication and Normalization
+# Status: pending
+# Dependencies: 2, 3
+# Priority: medium
+# Description: Create utilities for normalizing event data and detecting duplicates based on title, venue, and date.
+# Details:
+Implement normalization and deduplication logic:
+
+1. Create a normalizer for event fields (title, venue, date)
+2. Generate dedupeKey = normalize(title+venue+firstDate)
+3. Implement fuzzy business matching based on name and address/city
+4. Add confidence scoring for each field and overall candidate
+
+Example implementation:
+```typescript
+// utils/eventNormalizer.ts
+export function normalizeTitle(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^\w\s]/g, '') // Remove special chars
+    .replace(/\s+/g, ' ')    // Normalize whitespace
+    .trim();
+}
+
+export function normalizeVenue(venue: string): string {
+  return venue
+    .toLowerCase()
+    .replace(/[^\w\s]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function normalizeDate(date: Date): string {
+  return date.toISOString().split('T')[0]; // YYYY-MM-DD
+}
+
+export function generateDedupeKey(title: string, venue: string, date: Date): string {
+  return [
+    normalizeTitle(title),
+    normalizeVenue(venue || ''),
+    normalizeDate(date)
+  ].join('|');
+}
+
+export function calculateConfidence(candidate: EventCandidate): number {
+  let score = 0;
+  let fields = 0;
+  
+  // Title is required
+  score += candidate.title ? 1 : 0;
+  fields += 1;
+  
+  // Optional fields
+  if (candidate.startDate) { score += 1; fields += 1; }
+  if (candidate.venue) { score += 1; fields += 1; }
+  if (candidate.description) { score += 0.5; fields += 0.5; }
+  if (candidate.imageUrl) { score += 0.5; fields += 0.5; }
+  
+  // Calculate percentage
+  return fields > 0 ? (score / fields) : 0;
+}
+
+export function findSimilarBusiness(venue: string, address: string, businesses: Business[]): Business[] {
+  // Implement fuzzy matching logic
+  return businesses
+    .map(business => ({
+      business,
+      score: calculateSimilarity(venue, business.name) * 0.7 +
+             calculateSimilarity(address, business.address) * 0.3
+    }))
+    .filter(result => result.score > 0.6)
+    .sort((a, b) => b.score - a.score)
+    .map(result => result.business);
+}
+
+function calculateSimilarity(a: string, b: string): number {
+  // Implement Levenshtein distance or other similarity algorithm
+  // Return score between 0-1
+}
+```
+
+# Test Strategy:
+1. Unit tests for each normalization function
+2. Test deduplication with similar events
+3. Test fuzzy business matching with various inputs
+4. Benchmark performance with large datasets
+5. Test edge cases (empty strings, special characters, etc.)
+6. Verify confidence scoring with different event data completeness

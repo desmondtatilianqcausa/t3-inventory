@@ -1,0 +1,76 @@
+# Task ID: 3
+# Title: Create Convex Data Models
+# Status: pending
+# Dependencies: None
+# Priority: high
+# Description: Design and implement the Convex data models for event sources, import jobs, and event candidates.
+# Details:
+Create the following Convex schema files:
+
+1. eventSources.ts - Stores URLs and associated city information
+2. eventImportJobs.ts - Tracks scraping jobs and their status
+3. eventCandidates.ts - Stores extracted event candidates pending review
+
+Example implementation:
+```typescript
+// schema/eventSources.ts
+import { defineTable, s } from 'convex/schema';
+
+export default defineTable({
+  url: s.string(),
+  cityId: s.id('cities'),
+  city: s.string(),
+  state: s.string(),
+  lastScraped: s.optional(s.number()),
+  active: s.boolean(),
+  createdAt: s.number(),
+  updatedAt: s.number(),
+});
+
+// schema/eventImportJobs.ts
+import { defineTable, s } from 'convex/schema';
+
+export default defineTable({
+  sourceId: s.id('eventSources'),
+  status: s.union(s.literal('pending'), s.literal('running'), s.literal('completed'), s.literal('failed')),
+  startedAt: s.number(),
+  completedAt: s.optional(s.number()),
+  candidatesCount: s.number(),
+  logs: s.array(s.object({
+    timestamp: s.number(),
+    level: s.string(),
+    message: s.string(),
+  })),
+  error: s.optional(s.string()),
+});
+
+// schema/eventCandidates.ts
+import { defineTable, s } from 'convex/schema';
+
+export default defineTable({
+  jobId: s.id('eventImportJobs'),
+  sourceId: s.id('eventSources'),
+  cityId: s.id('cities'),
+  title: s.string(),
+  description: s.optional(s.string()),
+  startDate: s.optional(s.number()),
+  endDate: s.optional(s.number()),
+  venue: s.optional(s.string()),
+  address: s.optional(s.string()),
+  imageUrl: s.optional(s.string()),
+  url: s.optional(s.string()),
+  dedupeKey: s.string(),
+  confidence: s.number(),
+  status: s.union(s.literal('pending'), s.literal('approved'), s.literal('ignored')),
+  extractionMethod: s.string(),
+  rawData: s.any(),
+  createdAt: s.number(),
+});
+```
+
+# Test Strategy:
+1. Verify schema definitions with Convex's validation tools
+2. Test data insertion and retrieval with sample data
+3. Ensure proper indexing for efficient queries
+4. Test relationships between tables
+5. Validate constraints and data types

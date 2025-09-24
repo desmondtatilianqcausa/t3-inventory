@@ -1,0 +1,103 @@
+# Task ID: 4
+# Title: Implement Convex Actions and Mutations
+# Status: pending
+# Dependencies: 3
+# Priority: high
+# Description: Create Convex actions and mutations for managing event sources, import jobs, and candidates.
+# Details:
+Implement the following Convex functions:
+
+1. startEventImportJob(sourceId|url, cityId) - Initiates a scraping job
+2. writeCandidates(jobId, candidates[]) - Stores extracted candidates
+3. approveCandidate(candidateId, businessId, categories?, pricing?, recurring?) - Approves a candidate and creates an event
+4. ignoreCandidate(candidateId) - Marks a candidate as ignored
+
+Example implementation:
+```typescript
+// actions/events/startImportJob.ts
+import { action } from "_generated/server";
+import { v } from "convex/values";
+import { api } from "_generated/api";
+
+export default action({
+  args: {
+    sourceId: v.optional(v.id("eventSources")),
+    url: v.optional(v.string()),
+    cityId: v.id("cities"),
+  },
+  handler: async (ctx, args) => {
+    // Validate args - either sourceId or url must be provided
+    if (!args.sourceId && !args.url) {
+      throw new Error("Either sourceId or url must be provided");
+    }
+    
+    let sourceId = args.sourceId;
+    
+    // If URL provided but no sourceId, create a new source
+    if (!sourceId && args.url) {
+      const city = await ctx.runQuery(api.cities.getById, { id: args.cityId });
+      if (!city) throw new Error("City not found");
+      
+      sourceId = await ctx.runMutation(api.eventSources.create, {
+        url: args.url,
+        cityId: args.cityId,
+        city: city.name,
+        state: city.state,
+        active: true,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+    }
+    
+    // Create import job
+    const jobId = await ctx.runMutation(api.eventImportJobs.create, {
+      sourceId,
+      status: "pending",
+      startedAt: Date.now(),
+      candidatesCount: 0,
+      logs: [{
+        timestamp: Date.now(),
+        level: "info",
+        message: "Job created",
+      }],
+    });
+    
+    // Get source details
+    const source = await ctx.runQuery(api.eventSources.getById, { id: sourceId });
+    
+    // Call scraper service
+    const response = await fetch(`${process.env.SCRAPER_URL}/scrape/events`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url: source.url,
+        cityId: source.cityId,
+        city: source.city,
+        state: source.state,
+        jobId,
+      }),
+    });
+    
+    if (!response.ok) {
+      const error = await response.text();
+      await ctx.runMutation(api.eventImportJobs.update, {
+        id: jobId,
+        status: "failed",
+        error,
+        completedAt: Date.now(),
+      });
+      throw new Error(`Scraper service error: ${error}`);
+    }
+    
+    return { jobId };
+  },
+});
+```
+
+# Test Strategy:
+1. Unit tests for each action and mutation
+2. Test with valid and invalid inputs
+3. Test error handling and edge cases
+4. Integration tests with mock scraper service
+5. End-to-end tests with real data
+6. Verify proper state transitions in the database

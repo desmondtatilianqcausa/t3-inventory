@@ -1,0 +1,91 @@
+# Task ID: 9
+# Title: Implement Primary CTAs for Tickets and Directions
+# Status: pending
+# Dependencies: 7
+# Priority: high
+# Description: Create sticky CTAs for ticket purchase and directions with appropriate deep links.
+# Details:
+Implement a component for the primary CTAs:
+
+```tsx
+const EventCTAs = ({ event, className }) => {
+  // Track analytics for CTA clicks
+  const trackTicketClick = () => {
+    // Analytics tracking code
+    console.log('Ticket CTA clicked', event.id);
+  };
+  
+  const trackDirectionsClick = (provider) => {
+    // Analytics tracking code
+    console.log(`Directions CTA clicked: ${provider}`, event.id);
+  };
+  
+  // Generate directions URLs
+  const getGoogleMapsUrl = () => {
+    const address = encodeURIComponent(`${event.venue}, ${event.address}, ${event.city}, ${event.state}`);
+    return `https://www.google.com/maps/search/?api=1&query=${address}`;
+  };
+  
+  const getAppleMapsUrl = () => {
+    const address = encodeURIComponent(`${event.venue}, ${event.address}, ${event.city}, ${event.state}`);
+    return `https://maps.apple.com/?q=${address}`;
+  };
+  
+  const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const directionsUrl = isIOS ? getAppleMapsUrl() : getGoogleMapsUrl();
+  
+  return (
+    <div className={`flex flex-col space-y-3 ${className}`}>
+      {event.ticketUrl && (
+        <a
+          href={event.ticketUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={trackTicketClick}
+          className="bg-blue-600 text-white py-3 px-6 rounded-lg font-medium text-center hover:bg-blue-700 transition-colors"
+          aria-label="Buy tickets for this event"
+        >
+          {event.isFree ? 'Register - Free' : event.isSoldOut ? 'Sold Out' : `Buy Tickets - $${event.price}`}
+        </a>
+      )}
+      
+      <a
+        href={directionsUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={() => trackDirectionsClick(isIOS ? 'apple' : 'google')}
+        className="bg-gray-100 text-gray-800 py-3 px-6 rounded-lg font-medium text-center hover:bg-gray-200 transition-colors"
+        aria-label="Get directions to this event"
+      >
+        Get Directions
+      </a>
+    </div>
+  );
+};
+```
+
+Make the CTAs sticky on scroll for both desktop and mobile using CSS:
+
+```css
+.sticky-cta {
+  position: sticky;
+  top: 1rem;
+  z-index: 10;
+}
+
+@media (max-width: 768px) {
+  .sticky-cta {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    top: auto;
+    padding: 1rem;
+    background: white;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+  }
+}
+```
+
+# Test Strategy:
+Test the CTAs on both desktop and mobile to verify sticky behavior. Test with various event data (free events, sold-out events, events with/without ticket URLs). Verify that the links open in new tabs with proper security attributes. Test that analytics tracking functions are called when CTAs are clicked.

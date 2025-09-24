@@ -1,0 +1,19 @@
+# Task ID: 2
+# Title: Create Event Seeding Migration
+# Status: pending
+# Dependencies: 1
+# Priority: high
+# Description: Update the seeding process to populate sample data for the new fields in the events table.
+# Details:
+Modify the existing seeding script to include data for all new fields:
+- Generate unique slugs based on event names (slugify)
+- Add sample ticketUrl values
+- Include venue names, addresses, cities, states
+- Set appropriate timeZones
+- Add price information and boolean flags (isFree, isSoldOut)
+- Include array of image URLs
+
+Ensure backward compatibility so existing data isn't corrupted. Create at least 10 sample events with varied data to test different scenarios.
+
+# Test Strategy:
+Run the seeding script in a test environment and verify all new fields are populated correctly. Check that slugs are unique and properly formatted. Verify that existing data remains intact.

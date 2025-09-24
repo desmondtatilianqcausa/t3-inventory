@@ -1,0 +1,167 @@
+# Task ID: 9
+# Title: Implement Ollama Integration
+# Status: pending
+# Dependencies: 1
+# Priority: high
+# Description: Create a client for interacting with Ollama's local LLM (llama3) for event extraction assistance.
+# Details:
+Implement an Ollama client for LLM-assisted event extraction:
+
+1. Create a client class for Ollama API communication
+2. Implement few-shot prompting for event extraction
+3. Add schema enforcement for structured output
+4. Handle error cases and retries
+
+Example implementation:
+```python
+# ollama_client.py
+import json
+import requests
+from typing import List, Dict, Any, Optional
+import time
+
+class OllamaClient:
+    def __init__(self, base_url: str = "http://localhost:11434", model: str = "llama3", num_ctx: int = 4096):
+        self.base_url = base_url
+        self.model = model
+        self.num_ctx = num_ctx
+        self.api_url = f"{self.base_url}/api/generate"
+    
+    def _call_api(self, prompt: str, max_retries: int = 3) -> str:
+        """Call Ollama API with retries"""
+        payload = {
+            "model": self.model,
+            "prompt": prompt,
+            "stream": False,
+            "options": {"num_ctx": self.num_ctx}
+        }
+        
+        for attempt in range(max_retries):
+            try:
+                response = requests.post(self.api_url, json=payload)
+                response.raise_for_status()
+                return response.json().get("response", "")
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    raise
+                time.sleep(1 * (attempt + 1))  # Exponential backoff
+    
+    def extract_events(self, content: str) -> List[Dict[str, Any]]:
+        """Extract events from content using few-shot prompting"""
+        # Define the event schema
+        schema = {
+            "title": "string",
+            "description": "string (optional)",
+            "startDate": "ISO date string",
+            "endDate": "ISO date string (optional)",
+            "venue": "string (optional)",
+            "address": "string (optional)",
+            "url": "string (optional)",
+            "imageUrl": "string (optional)"
+        }
+        
+        # Few-shot examples
+        examples = [
+            {
+                "content": "Join us for a Jazz Night at Blue Note on Friday, June 10th at 8pm. Tickets $15 at the door.",
+                "events": [{
+                    "title": "Jazz Night",
+                    "description": "Join us for a Jazz Night. Tickets $15 at the door.",
+                    "startDate": "2023-06-10T20:00:00",
+                    "venue": "Blue Note"
+                }]
+            },
+            {
+                "content": "Art Exhibition: Modern Perspectives\nWhen: May 15-20, 2023, 10am-6pm daily\nWhere: City Gallery, 123 Main St\nFree admission",
+                "events": [{
+                    "title": "Art Exhibition: Modern Perspectives",
+                    "description": "Free admission",
+                    "startDate": "2023-05-15T10:00:00",
+                    "endDate": "2023-05-20T18:00:00",
+                    "venue": "City Gallery",
+                    "address": "123 Main St"
+                }]
+            }
+        ]
+        
+        # Build prompt
+        prompt = f"""Extract events from the following content. Return a JSON array of events with these fields: {json.dumps(schema)}
+
+Here are some examples:
+
+"""
+        
+        for example in examples:
+            prompt += f"Content: {example['content']}\n"
+            prompt += f"Events: {json.dumps(example['events'])}\n\n"
+        
+        prompt += f"Content: {content}\n"
+        prompt += "Events: "
+        
+        # Call API
+        try:
+            result = self._call_api(prompt)
+            
+            # Try to parse JSON from the response
+            # Sometimes the model might add extra text, so we need to extract the JSON part
+            try:
+                # First try direct parsing
+                events = json.loads(result)
+                if not isinstance(events, list):
+                    events = [events]  # Handle single event case
+            except json.JSONDecodeError:
+                # Try to extract JSON array from text
+                import re
+                json_match = re.search(r'\[\s*{.*}\s*\]', result, re.DOTALL)
+                if json_match:
+                    events = json.loads(json_match.group(0))
+                else:
+                    # Last resort: try to extract a single JSON object
+                    json_match = re.search(r'{.*}', result, re.DOTALL)
+                    if json_match:
+                        events = [json.loads(json_match.group(0))]
+                    else:
+                        events = []
+            
+            return events
+        except Exception as e:
+            print(f"Error extracting events: {str(e)}")
+            return []
+    
+    def enhance_event(self, event: Dict[str, Any]) -> Dict[str, Any]:
+        """Enhance an event with missing fields or improve descriptions"""
+        prompt = f"""Enhance this event by filling in missing fields or improving descriptions. 
+        Return the enhanced event as a JSON object.
+        
+        Original event: {json.dumps(event)}
+        
+        Enhanced event: """
+        
+        try:
+            result = self._call_api(prompt)
+            
+            # Try to parse JSON from the response
+            try:
+                enhanced = json.loads(result)
+                return enhanced
+            except json.JSONDecodeError:
+                # Try to extract JSON object from text
+                import re
+                json_match = re.search(r'{.*}', result, re.DOTALL)
+                if json_match:
+                    return json.loads(json_match.group(0))
+                else:
+                    return event  # Return original if parsing fails
+        except Exception as e:
+            print(f"Error enhancing event: {str(e)}")
+            return event  # Return original if enhancement fails
+```
+
+# Test Strategy:
+1. Unit tests for Ollama client initialization and configuration
+2. Test API call method with mock responses
+3. Test event extraction with sample content
+4. Test error handling and retries
+5. Test JSON parsing from various response formats
+6. Benchmark performance with different content sizes
+7. Test with real Ollama instance running locally

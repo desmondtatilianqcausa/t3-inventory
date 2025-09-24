@@ -1,24 +1,35 @@
-import { defineSchema, defineTable } from "convex/server";
+import { integrationConnections, integrations } from "./integrations/schema";
+import { orderLineItems, orders } from "./orders/schema";
+import { productCategories, products } from "./products/schema";
+import { userRoles, users } from "./users/schema";
+import {
+  workflow_runs,
+  workflow_steps,
+  workflow_versions,
+  workflows,
+} from "./workflows/schema";
 
-import { v } from "convex/values";
+import { authTables } from "@convex-dev/auth/server";
+import { defineSchema } from "convex/server";
+import { events } from "./events/schema";
+import { formResponses } from "./formResponses/schema";
+import { logs } from "./logs/schema";
 
 export default defineSchema({
-  events: defineTable({
-    title: v.string(),
-    description: v.optional(v.string()),
-    lat: v.number(),
-    lng: v.number(),
-    color: v.optional(v.string()),
-    startAt: v.optional(v.number()),
-    endAt: v.optional(v.number()),
-    featured: v.optional(v.boolean()),
-    categoryIds: v.optional(v.array(v.id("categories"))),
-  }).index("by_category", ["categoryIds"]),
-  categories: defineTable({
-    name: v.string(),
-    slug: v.string(),
-    postTypes: v.array(v.string()), // e.g. ["event"]
-  })
-    .index("by_slug", ["slug"])
-    .index("by_postType", ["postTypes"]),
+  ...authTables,
+  users,
+  userRoles,
+  formResponses,
+  products,
+  productCategories,
+  logs,
+  orders,
+  orderLineItems,
+  events,
+  integrations,
+  integrationConnections,
+  workflows,
+  workflow_versions,
+  workflow_runs,
+  workflow_steps,
 });

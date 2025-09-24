@@ -1,0 +1,28 @@
+# Task ID: 5
+# Title: Create Next.js Event Page with Dynamic Routes
+# Status: pending
+# Dependencies: 3
+# Priority: high
+# Description: Set up the Next.js App Router with dynamic routes for event pages using both ID and slug patterns.
+# Details:
+Create the following route structure:
+- `/app/event/[slug]/page.tsx` - Main event page using slug
+- `/app/event/[id]/page.tsx` - Redirect page for ID-based URLs
+
+Implement the ID-based page to redirect to the slug-based URL:
+```typescript
+export async function generateMetadata({ params }) {
+  const event = await getEvent(params.id);
+  return { title: event.title };
+}
+
+export default async function EventIdPage({ params }) {
+  const event = await getEvent(params.id);
+  redirect(`/event/${event.slug}`);
+}
+```
+
+For the slug-based page, fetch data using the new getBySlug query and set up the basic page structure that will be enhanced in subsequent tasks.
+
+# Test Strategy:
+Test both routes to ensure the ID-based route correctly redirects to the slug-based URL. Verify that the slug-based page loads the correct event data. Test with valid and invalid IDs/slugs to ensure proper error handling.

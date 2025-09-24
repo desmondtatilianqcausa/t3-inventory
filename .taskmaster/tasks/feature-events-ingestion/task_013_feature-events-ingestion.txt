@@ -1,0 +1,248 @@
+# Task ID: 13
+# Title: Implement Meetup Adapter
+# Status: pending
+# Dependencies: 10
+# Priority: medium
+# Description: Create a domain-specific adapter for extracting events from Meetup pages.
+# Details:
+Implement a Meetup-specific adapter:
+
+1. Create configuration for Meetup event pages
+2. Implement JSON-LD extraction and parsing
+3. Add recurrence handling
+4. Extract group and location information
+
+Example implementation:
+```yaml
+# adapters/meetup.yaml
+name: Meetup
+description: Adapter for Meetup event pages
+
+selectors:
+  json_ld: 'script[type="application/ld+json"]'
+  event_details: '.eventDetails'
+  title: '.eventTitle'
+  date: '.eventTimeDisplay'
+  venue: '.venueDisplay'
+  address: '.venueAddress'
+  description: '.eventDescription'
+  group: '.groupName'
+  image: '.eventImage img'
+
+date_formats:
+  - '%Y-%m-%dT%H:%M:%S'
+```
+
+```python
+# adapters/meetup.py
+from typing import List, Dict, Any, Optional
+import json
+import re
+from datetime import datetime
+from bs4 import BeautifulSoup
+import dateparser
+from .base import BaseAdapter
+
+class MeetupAdapter(BaseAdapter):
+    def extract_events(self, url: str, html_content: str) -> List[Dict[str, Any]]:
+        """Extract events from Meetup pages"""
+        events = []
+        soup = BeautifulSoup(html_content, 'html.parser')
+        
+        # Try JSON-LD extraction first
+        json_ld_events = self._extract_json_ld(soup)
+        if json_ld_events:
+            events.extend(json_ld_events)
+            return events
+        
+        # Fallback to HTML parsing
+        event = self._extract_from_html(soup, url)
+        if event:
+            events.append(event)
+        
+        return events
+    
+    def _extract_json_ld(self, soup: BeautifulSoup) -> List[Dict[str, Any]]:
+        """Extract event data from JSON-LD"""
+        events = []
+        json_ld_tags = soup.select(self.selectors.get('json_ld', 'script[type="application/ld+json"]'))
+        
+        for tag in json_ld_tags:
+            try:
+                data = json.loads(tag.string)
+                
+                # Handle array or single object
+                if isinstance(data, list):
+                    items = data
+                else:
+                    items = [data]
+                
+                for item in items:
+                    # Check if it's an Event type
+                    if item.get('@type') == 'Event':
+                        event = self._parse_json_ld_event(item)
+                        if event:
+                            events.append(event)
+            except (json.JSONDecodeError, AttributeError):
+                continue
+        
+        return events
+    
+    def _parse_json_ld_event(self, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Parse JSON-LD event data"""
+        event = {
+            'title': data.get('name', ''),
+            'description': data.get('description', ''),
+            'url': data.get('url', '')
+        }
+        
+        # If no title, skip this event
+        if not event['title']:
+            return None
+        
+        # Parse start date
+        start_date = data.get('startDate')
+        if start_date:
+            try:
+                event['startDate'] = self._parse_iso_date(start_date)
+            except ValueError:
+                pass
+        
+        # Parse end date
+        end_date = data.get('endDate')
+        if end_date:
+            try:
+                event['endDate'] = self._parse_iso_date(end_date)
+            except ValueError:
+                pass
+        
+        # Parse location
+        location = data.get('location', {})
+        if location:
+            if isinstance(location, dict):
+                event['venue'] = location.get('name', '')
+                
+                address = location.get('address', {})
+                if isinstance(address, dict):
+                    addr_parts = [
+                        address.get('streetAddress', ''),
+                        address.get('addressLocality', ''),
+                        address.get('addressRegion', ''),
+                        address.get('postalCode', '')
+                    ]
+                    event['address'] = ', '.join(filter(None, addr_parts))
+        
+        # Parse image
+        image = data.get('image')
+        if image:
+            if isinstance(image, list) and len(image) > 0:
+                event['imageUrl'] = image[0]
+            elif isinstance(image, str):
+                event['imageUrl'] = image
+        
+        # Extract group information
+        organizer = data.get('organizer', {})
+        if organizer and isinstance(organizer, dict):
+            group_name = organizer.get('name')
+            if group_name:
+                if 'description' in event:
+                    event['description'] = f"Organized by {group_name}\n\n{event['description']}"
+                else:
+                    event['description'] = f"Organized by {group_name}"
+        
+        return event
+    
+    def _extract_from_html(self, soup: BeautifulSoup, url: str) -> Optional[Dict[str, Any]]:
+        """Extract event data from HTML as fallback"""
+        event = {'url': url}
+        
+        # Extract title
+        title_elem = soup.select_one(self.selectors.get('title'))
+        if title_elem:
+            event['title'] = title_elem.get_text(strip=True)
+        else:
+            # Title is required
+            return None
+        
+        # Extract date
+        date_elem = soup.select_one(self.selectors.get('date'))
+        if date_elem:
+            date_text = date_elem.get_text(strip=True)
+            date = self._parse_date_text(date_text)
+            if date:
+                event['startDate'] = date.isoformat()
+        
+        # Extract venue
+        venue_elem = soup.select_one(self.selectors.get('venue'))
+        if venue_elem:
+            event['venue'] = venue_elem.get_text(strip=True)
+        
+        # Extract address
+        address_elem = soup.select_one(self.selectors.get('address'))
+        if address_elem:
+            event['address'] = address_elem.get_text(strip=True)
+        
+        # Extract description
+        desc_elem = soup.select_one(self.selectors.get('description'))
+        if desc_elem:
+            event['description'] = desc_elem.get_text(strip=True)
+        
+        # Extract group
+        group_elem = soup.select_one(self.selectors.get('group'))
+        if group_elem:
+            group_name = group_elem.get_text(strip=True)
+            if group_name:
+                if 'description' in event:
+                    event['description'] = f"Organized by {group_name}\n\n{event['description']}"
+                else:
+                    event['description'] = f"Organized by {group_name}"
+        
+        # Extract image
+        img_elem = soup.select_one(self.selectors.get('image'))
+        if img_elem and img_elem.get('src'):
+            event['imageUrl'] = img_elem['src']
+        
+        return event
+    
+    def _parse_iso_date(self, date_str: str) -> str:
+        """Parse ISO date string"""
+        # Handle various ISO formats
+        formats = [
+            '%Y-%m-%dT%H:%M:%S',
+            '%Y-%m-%dT%H:%M:%SZ',
+            '%Y-%m-%dT%H:%M:%S%z'
+        ]
+        
+        for fmt in formats:
+            try:
+                return datetime.strptime(date_str, fmt).isoformat()
+            except ValueError:
+                continue
+        
+        # If all formats fail, try dateparser
+        date = dateparser.parse(date_str)
+        if date:
+            return date.isoformat()
+        
+        raise ValueError(f"Could not parse date: {date_str}")
+    
+    def _parse_date_text(self, date_text: str) -> Optional[datetime]:
+        """Parse date from text"""
+        # Meetup specific date formats
+        # Example: "Thursday, June 15, 2023 at 6:30 PM to 8:30 PM"
+        match = re.search(r'(\w+, \w+ \d+, \d{4} at \d+:\d+ [AP]M)', date_text)
+        if match:
+            return dateparser.parse(match.group(1))
+        
+        # Fallback to dateparser
+        return dateparser.parse(date_text)
+```
+
+# Test Strategy:
+1. Unit tests for Meetup adapter with sample HTML content
+2. Test JSON-LD extraction with various structures
+3. Test HTML fallback extraction
+4. Test date parsing with Meetup-specific formats
+5. Test group information extraction
+6. Integration tests with real Meetup URLs
+7. Test with both online and in-person events

@@ -1,0 +1,68 @@
+# Task ID: 11
+# Title: Implement Organizer Section
+# Status: pending
+# Dependencies: 7, 1
+# Priority: medium
+# Description: Create a component to display organizer information including name, avatar, and contact links.
+# Details:
+Implement the Organizer component:
+
+```tsx
+const OrganizerSection = ({ organizer }) => {
+  if (!organizer) return null;
+  
+  return (
+    <div className="border-t border-gray-200 pt-6 mt-6">
+      <h3 className="text-lg font-medium mb-4">Organizer</h3>
+      <div className="flex items-center">
+        {organizer.avatar ? (
+          <Image
+            src={organizer.avatar}
+            alt={organizer.name}
+            width={48}
+            height={48}
+            className="rounded-full object-cover"
+          />
+        ) : (
+          <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center text-gray-500">
+            <UserIcon className="w-6 h-6" />
+          </div>
+        )}
+        
+        <div className="ml-4">
+          <h4 className="font-medium">{organizer.name}</h4>
+          {organizer.website && (
+            <a 
+              href={organizer.website}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:underline text-sm flex items-center mt-1"
+              aria-label={`Visit ${organizer.name}'s website (opens in new tab)`}
+            >
+              <GlobeIcon className="w-4 h-4 mr-1" />
+              Website
+              <span className="sr-only">(opens in new tab)</span>
+            </a>
+          )}
+          {organizer.email && (
+            <a 
+              href={`mailto:${organizer.email}`}
+              className="text-blue-600 hover:underline text-sm flex items-center mt-1"
+            >
+              <MailIcon className="w-4 h-4 mr-1" />
+              Contact
+            </a>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+```
+
+Update the Convex data model to include organizer information if not already present:
+- Add organizer fields to the event schema (name, avatar, website, email)
+- Update the seeding script to include sample organizer data
+
+# Test Strategy:
+Test the Organizer component with various data scenarios (with/without avatar, with/without website or email). Verify that external links open in new tabs with proper security attributes. Test with missing organizer data to ensure graceful handling.

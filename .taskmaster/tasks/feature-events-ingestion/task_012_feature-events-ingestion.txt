@@ -1,0 +1,252 @@
+# Task ID: 12
+# Title: Implement Eventbrite Adapter
+# Status: pending
+# Dependencies: 10
+# Priority: medium
+# Description: Create a domain-specific adapter for extracting events from Eventbrite pages.
+# Details:
+Implement an Eventbrite-specific adapter:
+
+1. Create configuration for Eventbrite event pages
+2. Implement JSON-LD extraction and parsing
+3. Add schedule parsing for recurring events
+4. Handle Eventbrite-specific data structures
+
+Example implementation:
+```yaml
+# adapters/eventbrite.yaml
+name: Eventbrite
+description: Adapter for Eventbrite event pages
+
+selectors:
+  json_ld: 'script[type="application/ld+json"]'
+  event_details: '.event-details'
+  title: '.event-title'
+  date: '.event-date'
+  venue: '.event-venue'
+  address: '.event-address'
+  description: '.event-description'
+  image: '.event-image img'
+
+date_formats:
+  - '%Y-%m-%dT%H:%M:%S'
+```
+
+```python
+# adapters/eventbrite.py
+from typing import List, Dict, Any
+import json
+import re
+from datetime import datetime
+from bs4 import BeautifulSoup
+from .base import BaseAdapter
+
+class EventbriteAdapter(BaseAdapter):
+    def extract_events(self, url: str, html_content: str) -> List[Dict[str, Any]]:
+        """Extract events from Eventbrite pages"""
+        events = []
+        soup = BeautifulSoup(html_content, 'html.parser')
+        
+        # Try JSON-LD extraction first (most reliable)
+        json_ld_events = self._extract_json_ld(soup)
+        if json_ld_events:
+            events.extend(json_ld_events)
+            return events
+        
+        # Fallback to HTML parsing if JSON-LD not available
+        event = self._extract_from_html(soup, url)
+        if event:
+            events.append(event)
+        
+        return events
+    
+    def _extract_json_ld(self, soup: BeautifulSoup) -> List[Dict[str, Any]]:
+        """Extract event data from JSON-LD"""
+        events = []
+        json_ld_tags = soup.select(self.selectors.get('json_ld', 'script[type="application/ld+json"]'))
+        
+        for tag in json_ld_tags:
+            try:
+                data = json.loads(tag.string)
+                
+                # Handle array or single object
+                if isinstance(data, list):
+                    items = data
+                else:
+                    items = [data]
+                
+                for item in items:
+                    # Check if it's an Event type
+                    if item.get('@type') == 'Event':
+                        event = self._parse_json_ld_event(item)
+                        if event:
+                            events.append(event)
+            except (json.JSONDecodeError, AttributeError):
+                continue
+        
+        return events
+    
+    def _parse_json_ld_event(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Parse JSON-LD event data"""
+        event = {
+            'title': data.get('name', ''),
+            'description': data.get('description', ''),
+            'url': data.get('url', '')
+        }
+        
+        # Parse start date
+        start_date = data.get('startDate')
+        if start_date:
+            try:
+                event['startDate'] = self._parse_iso_date(start_date)
+            except ValueError:
+                pass
+        
+        # Parse end date
+        end_date = data.get('endDate')
+        if end_date:
+            try:
+                event['endDate'] = self._parse_iso_date(end_date)
+            except ValueError:
+                pass
+        
+        # Parse location
+        location = data.get('location', {})
+        if location:
+            if isinstance(location, dict):
+                event['venue'] = location.get('name', '')
+                
+                address = location.get('address', {})
+                if isinstance(address, dict):
+                    addr_parts = [
+                        address.get('streetAddress', ''),
+                        address.get('addressLocality', ''),
+                        address.get('addressRegion', ''),
+                        address.get('postalCode', '')
+                    ]
+                    event['address'] = ', '.join(filter(None, addr_parts))
+        
+        # Parse image
+        image = data.get('image')
+        if image:
+            if isinstance(image, list) and len(image) > 0:
+                event['imageUrl'] = image[0]
+            elif isinstance(image, str):
+                event['imageUrl'] = image
+        
+        # Check for recurring event
+        if 'eventSchedule' in data:
+            return self._handle_recurring_event(event, data['eventSchedule'])
+        
+        return event
+    
+    def _handle_recurring_event(self, base_event: Dict[str, Any], schedule: Any) -> Dict[str, Any]:
+        """Handle recurring event schedule"""
+        # For now, just use the base event with the first occurrence
+        # In a more advanced implementation, this would create multiple event instances
+        if isinstance(schedule, list) and len(schedule) > 0:
+            first_occurrence = schedule[0]
+            
+            start_date = first_occurrence.get('startDate')
+            if start_date:
+                try:
+                    base_event['startDate'] = self._parse_iso_date(start_date)
+                except ValueError:
+                    pass
+            
+            end_date = first_occurrence.get('endDate')
+            if end_date:
+                try:
+                    base_event['endDate'] = self._parse_iso_date(end_date)
+                except ValueError:
+                    pass
+        
+        return base_event
+    
+    def _extract_from_html(self, soup: BeautifulSoup, url: str) -> Dict[str, Any]:
+        """Extract event data from HTML as fallback"""
+        event = {'url': url}
+        
+        # Extract title
+        title_elem = soup.select_one(self.selectors.get('title'))
+        if title_elem:
+            event['title'] = title_elem.get_text(strip=True)
+        else:
+            # Title is required
+            return None
+        
+        # Extract date
+        date_elem = soup.select_one(self.selectors.get('date'))
+        if date_elem:
+            date_text = date_elem.get_text(strip=True)
+            date = self._parse_date_text(date_text)
+            if date:
+                event['startDate'] = date.isoformat()
+        
+        # Extract venue
+        venue_elem = soup.select_one(self.selectors.get('venue'))
+        if venue_elem:
+            event['venue'] = venue_elem.get_text(strip=True)
+        
+        # Extract address
+        address_elem = soup.select_one(self.selectors.get('address'))
+        if address_elem:
+            event['address'] = address_elem.get_text(strip=True)
+        
+        # Extract description
+        desc_elem = soup.select_one(self.selectors.get('description'))
+        if desc_elem:
+            event['description'] = desc_elem.get_text(strip=True)
+        
+        # Extract image
+        img_elem = soup.select_one(self.selectors.get('image'))
+        if img_elem and img_elem.get('src'):
+            event['imageUrl'] = img_elem['src']
+        
+        return event
+    
+    def _parse_iso_date(self, date_str: str) -> str:
+        """Parse ISO date string"""
+        # Handle various ISO formats
+        formats = [
+            '%Y-%m-%dT%H:%M:%S',
+            '%Y-%m-%dT%H:%M:%SZ',
+            '%Y-%m-%dT%H:%M:%S%z'
+        ]
+        
+        for fmt in formats:
+            try:
+                return datetime.strptime(date_str, fmt).isoformat()
+            except ValueError:
+                continue
+        
+        # If all formats fail, try dateparser
+        import dateparser
+        date = dateparser.parse(date_str)
+        if date:
+            return date.isoformat()
+        
+        raise ValueError(f"Could not parse date: {date_str}")
+    
+    def _parse_date_text(self, date_text: str) -> Optional[datetime]:
+        """Parse date from text"""
+        # Try to extract date and time using regex
+        date_match = re.search(r'\b(\w+ \d{1,2}(?:st|nd|rd|th)?, \d{4})\b', date_text)
+        time_match = re.search(r'\b(\d{1,2}:\d{2} (?:AM|PM))\b', date_text)
+        
+        if date_match and time_match:
+            date_str = f"{date_match.group(1)} {time_match.group(1)}"
+            return dateparser.parse(date_str)
+        
+        # Fallback to dateparser for the whole string
+        return dateparser.parse(date_text)
+```
+
+# Test Strategy:
+1. Unit tests for Eventbrite adapter with sample HTML content
+2. Test JSON-LD extraction with various structures
+3. Test HTML fallback extraction
+4. Test date parsing with different formats
+5. Test recurring event handling
+6. Integration tests with real Eventbrite URLs
+7. Test with both single and multi-day events

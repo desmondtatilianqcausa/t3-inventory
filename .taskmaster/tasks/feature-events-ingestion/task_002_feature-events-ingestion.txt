@@ -1,0 +1,62 @@
+# Task ID: 2
+# Title: Implement Generic Extraction Pipeline
+# Status: pending
+# Dependencies: 1
+# Priority: high
+# Description: Build the core extraction pipeline that uses multiple strategies to extract event data from web pages.
+# Details:
+Implement a multi-strategy extraction pipeline with the following components:
+
+1. Page fetching using requests/Playwright
+2. Main content extraction using trafilatura/Readability/BS4
+3. JSON-LD detection for structured data
+4. ICS file discovery and parsing
+5. Heuristic extraction using line blocks + time regex
+6. LLM-assisted extraction with few-shot prompting and schema enforcement
+7. Result normalization and confidence scoring
+
+Example implementation:
+```python
+class EventExtractor:
+    def __init__(self, config):
+        self.config = config
+        self.ollama_client = OllamaClient(base_url=config.base_url, model=config.model)
+    
+    async def extract(self, url, html_content):
+        candidates = []
+        
+        # 1. Try JSON-LD extraction
+        json_ld_events = self._extract_json_ld(html_content)
+        if json_ld_events:
+            candidates.extend(self._normalize_json_ld(json_ld_events))
+        
+        # 2. Try ICS discovery and parsing
+        ics_links = self._find_ics_links(html_content, url)
+        if ics_links:
+            ics_events = await self._fetch_and_parse_ics(ics_links)
+            candidates.extend(self._normalize_ics(ics_events))
+        
+        # 3. Apply heuristics for time/date patterns
+        main_content = self._extract_main_content(html_content)
+        heuristic_events = self._apply_heuristics(main_content)
+        candidates.extend(heuristic_events)
+        
+        # 4. LLM pass as fallback or enhancer
+        if len(candidates) < 2:
+            llm_events = await self._extract_with_llm(main_content)
+            candidates.extend(llm_events)
+        else:
+            # Use LLM to enhance existing candidates
+            enhanced = await self._enhance_with_llm(candidates)
+            candidates = enhanced
+        
+        # 5. Normalize and dedupe
+        return self._normalize_and_dedupe(candidates)
+```
+
+# Test Strategy:
+1. Unit tests for each extraction strategy (JSON-LD, ICS, heuristics, LLM)
+2. Integration tests with sample HTML files from different sources
+3. Test with real-world examples of event pages
+4. Measure extraction accuracy and recall
+5. Test normalization and deduplication logic

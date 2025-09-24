@@ -1,0 +1,54 @@
+# Task ID: 7
+# Title: Design Event Page Layout and Components
+# Status: pending
+# Dependencies: 5
+# Priority: high
+# Description: Create the main layout and components for the event page including hero image, event details, and sidebar.
+# Details:
+Implement the following components:
+
+1. EventHero - Displays the cover image with fallback to color placeholder
+```tsx
+const EventHero = ({ event }) => {
+  if (event.images && event.images.length > 0) {
+    return (
+      <div className="relative h-64 md:h-80 w-full">
+        <Image 
+          src={event.images[0]}
+          alt={event.title}
+          fill
+          className="object-cover"
+          sizes="(max-width: 768px) 100vw, 1200px"
+          priority
+        />
+        {event.featured && (
+          <div className="absolute top-4 left-4 bg-yellow-500 text-white px-3 py-1 rounded-full text-sm font-medium">
+            Featured
+          </div>
+        )}
+      </div>
+    );
+  }
+  return (
+    <div className="bg-gradient-to-r from-blue-500 to-purple-600 h-64 md:h-80 w-full relative">
+      <div className="absolute inset-0 flex items-center justify-center text-white text-2xl font-bold">
+        {event.title}
+      </div>
+      {event.featured && (
+        <div className="absolute top-4 left-4 bg-yellow-500 text-white px-3 py-1 rounded-full text-sm font-medium">
+          Featured
+        </div>
+      )}
+    </div>
+  );
+};
+```
+
+2. EventDetails - Shows event information (title, date, description)
+3. EventSidebar - Contains CTAs, organizer info, and map
+4. CategoryBadge - Displays event category
+
+Create a responsive layout with the sidebar on the right for desktop and below the main content on mobile. Use CSS Grid or Flexbox for the layout.
+
+# Test Strategy:
+Test the layout on various screen sizes to ensure responsiveness. Verify that the hero image displays correctly with proper fallback. Check that all components render the event data correctly. Test with and without images to ensure the fallback works as expected.

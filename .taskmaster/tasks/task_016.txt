@@ -1,0 +1,76 @@
+# Task ID: 16
+# Title: Optimize Performance and Core Web Vitals
+# Status: pending
+# Dependencies: 7, 8, 14
+# Priority: high
+# Description: Implement performance optimizations to ensure good Core Web Vitals scores.
+# Details:
+Implement the following performance optimizations:
+
+1. Lazy load non-critical components:
+```tsx
+const Map = dynamic(() => import('@/components/Map'), {
+  loading: () => <div className="h-64 w-full bg-gray-100 animate-pulse rounded-lg" />,
+  ssr: false
+});
+```
+
+2. Use Next.js Image component with proper sizing:
+```tsx
+<Image
+  src={event.images[0]}
+  alt={event.title}
+  width={1200}
+  height={630}
+  priority={true} // For hero image
+  className="object-cover"
+  sizes="(max-width: 768px) 100vw, 1200px"
+/>
+```
+
+3. Preload critical fonts and styles:
+```tsx
+export function Head() {
+  return (
+    <>
+      <link
+        rel="preload"
+        href="/fonts/inter-var.woff2"
+        as="font"
+        type="font/woff2"
+        crossOrigin="anonymous"
+      />
+    </>
+  );
+}
+```
+
+4. Implement proper caching strategies:
+```typescript
+export const runtime = 'edge';
+
+export async function generateMetadata({ params }) {
+  const event = await getEventBySlug(params.slug);
+  // ...
+}
+
+export const revalidate = 3600; // Revalidate every hour
+```
+
+5. Minimize JavaScript bundle size:
+- Use code splitting
+- Tree shake unused components
+- Optimize dependencies
+
+6. Implement a Web Vitals tracking function:
+```typescript
+import { onCLS, onFID, onLCP } from 'web-vitals';
+
+export function reportWebVitals(metric) {
+  // Analytics implementation
+  console.log(metric);
+}
+```
+
+# Test Strategy:
+Run Lighthouse audits to measure performance scores. Test Core Web Vitals (LCP, FID, CLS) in lab and field environments. Verify that lazy loading works correctly. Test the page load performance on various devices and network conditions.

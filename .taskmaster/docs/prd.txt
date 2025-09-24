@@ -1,0 +1,80 @@
+Title: Events Ingestion System (Ollama + ScrapeGraphAI + Convex)
+
+Overview
+Build a generic, promptless events ingestion pipeline integrated into the Next.js app (apps/nextjs) that lets admins add source URLs per city and review/import extracted events into Convex. The system favors generic extraction (JSON-LD, ICS, heuristics) with an LLM assist and optional domain adapters.
+
+Goals
+- Admin adds a URL per city (no per-URL prompts)
+- Scraper fetches, extracts candidate events, dedupes, and normalizes
+- Admin reviews candidates, maps to businesses, and approves import
+- Extensible with domain adapters for high-volume sites
+
+Non-Goals
+- Full automation with no review (initially)
+- Authenticated scraping (Facebook private groups, etc.)
+
+Stakeholders
+- Admins/content curators
+- Engineering (convex functions, scraper service)
+
+Tech Constraints
+- Use Ollama locally (llama3) and ScrapeGraphAI
+- Use Convex for storage; Next.js for admin UI
+- Keep adapters config-driven where possible
+
+Phase 1: Core Pipeline & Admin Review (Working base)
+Deliverables
+- Python scraper service (FastAPI or CLI module) wrapping ScrapeGraphAI
+  - Endpoints: POST /scrape/events { url, cityId, city, state }
+  - Generic pipeline: fetch (requests/Playwright), extract main content (trafilatura/Readability/BS4), JSON-LD detection, ICS discovery, heuristics (line blocks + time regex), LLM pass (few-shot, schema), normalization
+  - Config: model, base_url, num_ctx, user-agent, retries/timeouts
+- Convex data model additions
+  - eventSources, eventImportJobs, eventCandidates
+- Convex actions/mutations
+  - startEventImportJob(sourceId|url, cityId)
+  - writeCandidates(jobId, candidates[])
+  - approveCandidate(candidateId, businessId, categories?, pricing?, recurring?) -> events.create + instances
+  - ignoreCandidate(candidateId)
+- Next.js admin UI
+  - Add Source (city selector + URL)
+  - Jobs list + status/logs
+  - Review UI: list candidates, details sheet, business matcher (fuzzy), category pickers, approve/ignore
+- Dedupe & normalization
+  - dedupeKey = normalize(title+venue+firstDate)
+  - fuzzy business suggestion (name + address/city)
+
+Acceptance Criteria
+- Admin can add a URL and city, run import, see candidates with titles and (when available) times/venues
+- Approving a candidate creates an event and at least one instance
+- End-to-end path validated with Reddit old posts and at least one static site (blogs/events pages)
+
+Phase 2: Domain Adapters (High-volume domains)
+Deliverables
+- Adapter framework
+  - Hostname-based selection with small JSON/YAML configs (selectors, date headers, time formats, pagination)
+  - Optional code hooks for advanced cases (e.g., Eventbrite structured extraction)
+- Implement initial adapters
+  - Reddit: old/new variants (post body selectors, day-section splitting)
+  - Eventbrite: JSON-LD + schedule parsing
+  - Meetup: JSON-LD + recurrence
+  - Facebook public pages/events: headless fetch + content selectors (best effort)
+- Adapter registry
+  - Config files under apps/ollama/adapters/<domain>.yaml
+
+Acceptance Criteria
+- Given any supported domain, adapter improves recall/precision over generic pipeline
+- Adapters are data-driven (config) unless code is strictly necessary
+- Easy to add/modify adapters without changing core pipeline
+
+Cross-Cutting
+- Logging/monitoring: job status, errors, counts, coverage metrics
+- Rate limiting and robots/ToS awareness
+- Confidence scoring per candidate and field (used in review UI)
+
+Open Questions
+- Timezone inference for multi-city future (initially per city)
+- Persistent Playwright session/cookies for some public pages
+
+Timeline
+- Phase 1: 1–2 weeks to working review/import loop
+- Phase 2: 1–1.5 weeks for 3–4 adapters 

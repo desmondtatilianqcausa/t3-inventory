@@ -1,0 +1,61 @@
+# Task ID: 14
+# Title: Implement Analytics Tracking
+# Status: pending
+# Dependencies: 9, 10, 13
+# Priority: medium
+# Description: Set up analytics tracking for page views and user interactions.
+# Details:
+Create an analytics utility to track events:
+
+```typescript
+// lib/analytics.ts
+export const trackEvent = (eventName, properties = {}) => {
+  // Implementation depends on your analytics provider
+  // Example with Google Analytics
+  if (typeof window !== 'undefined' && window.gtag) {
+    window.gtag('event', eventName, properties);
+  }
+  
+  // Log for development
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[Analytics] ${eventName}`, properties);
+  }
+};
+
+export const trackPageView = (url, eventData = {}) => {
+  trackEvent('page_view', {
+    page_path: url,
+    ...eventData
+  });
+};
+```
+
+Implement tracking for key user interactions:
+1. Page view when event page loads
+2. Ticket CTA clicks
+3. Directions CTA clicks
+4. Calendar add actions
+5. Social sharing actions
+
+Add a layout effect to track page views:
+
+```tsx
+'use client';
+import { useEffect } from 'react';
+import { usePathname } from 'next/navigation';
+import { trackPageView } from '@/lib/analytics';
+
+export function AnalyticsProvider({ children, eventId, eventSlug }) {
+  const pathname = usePathname();
+  
+  useEffect(() => {
+    // Track page view
+    trackPageView(pathname, { eventId, eventSlug });
+  }, [pathname, eventId, eventSlug]);
+  
+  return children;
+}
+```
+
+# Test Strategy:
+Verify that analytics events are correctly fired for all tracked interactions. Test in both development and production environments. Check that the correct event properties are included in the tracking calls.

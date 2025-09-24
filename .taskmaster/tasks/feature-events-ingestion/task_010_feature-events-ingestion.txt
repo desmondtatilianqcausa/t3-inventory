@@ -1,0 +1,247 @@
+# Task ID: 10
+# Title: Implement Domain Adapter Framework
+# Status: pending
+# Dependencies: 2
+# Priority: medium
+# Description: Create a framework for domain-specific adapters that can be selected based on hostname.
+# Details:
+Implement a domain adapter framework:
+
+1. Create a base adapter class with common methods
+2. Implement adapter registry and selection logic
+3. Create configuration loader for YAML/JSON adapter configs
+4. Add hooks for custom code when needed
+
+Example implementation:
+```python
+# adapters/base.py
+from abc import ABC, abstractmethod
+from typing import List, Dict, Any, Optional
+import yaml
+import os
+import re
+from urllib.parse import urlparse
+
+class BaseAdapter(ABC):
+    def __init__(self, config: Dict[str, Any]):
+        self.config = config
+        self.selectors = config.get('selectors', {})
+        self.date_formats = config.get('date_formats', [])
+        self.pagination = config.get('pagination', {})
+    
+    @abstractmethod
+    def extract_events(self, url: str, html_content: str) -> List[Dict[str, Any]]:
+        """Extract events from HTML content"""
+        pass
+    
+    def get_main_content(self, html_content: str) -> str:
+        """Extract main content using configured selector"""
+        main_selector = self.selectors.get('main_content')
+        if not main_selector:
+            return html_content
+        
+        # Use BeautifulSoup to extract content
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(html_content, 'html.parser')
+        main_element = soup.select_one(main_selector)
+        return str(main_element) if main_element else html_content
+    
+    def get_next_page_url(self, html_content: str, current_url: str) -> Optional[str]:
+        """Get next page URL for pagination"""
+        if not self.pagination:
+            return None
+        
+        next_selector = self.pagination.get('next_selector')
+        if not next_selector:
+            return None
+        
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(html_content, 'html.parser')
+        next_element = soup.select_one(next_selector)
+        
+        if not next_element:
+            return None
+        
+        if next_element.name == 'a' and next_element.get('href'):
+            next_url = next_element['href']
+            # Handle relative URLs
+            if not next_url.startswith('http'):
+                parsed = urlparse(current_url)
+                base = f"{parsed.scheme}://{parsed.netloc}"
+                if next_url.startswith('/'):
+                    next_url = f"{base}{next_url}"
+                else:
+                    path = os.path.dirname(parsed.path)
+                    next_url = f"{base}{path}/{next_url}"
+            return next_url
+        
+        return None
+
+# adapters/registry.py
+import os
+import yaml
+import importlib
+from typing import Dict, Type, Optional
+from urllib.parse import urlparse
+from .base import BaseAdapter
+
+class AdapterRegistry:
+    def __init__(self, adapters_dir: str = 'adapters'):
+        self.adapters_dir = adapters_dir
+        self.adapters: Dict[str, Dict] = {}
+        self.custom_adapters: Dict[str, Type[BaseAdapter]] = {}
+        self._load_adapters()
+    
+    def _load_adapters(self):
+        """Load all adapter configurations from YAML files"""
+        if not os.path.exists(self.adapters_dir):
+            return
+        
+        for filename in os.listdir(self.adapters_dir):
+            if filename.endswith(('.yaml', '.yml')):
+                domain = os.path.splitext(filename)[0]
+                filepath = os.path.join(self.adapters_dir, filename)
+                
+                with open(filepath, 'r') as f:
+                    config = yaml.safe_load(f)
+                    self.adapters[domain] = config
+                
+                # Check if there's a custom implementation
+                custom_module = f"{self.adapters_dir}.{domain}"
+                try:
+                    module = importlib.import_module(custom_module)
+                    if hasattr(module, f"{domain.capitalize()}Adapter"):
+                        adapter_class = getattr(module, f"{domain.capitalize()}Adapter")
+                        self.custom_adapters[domain] = adapter_class
+                except (ImportError, AttributeError):
+                    pass
+    
+    def get_adapter_for_url(self, url: str) -> Optional[BaseAdapter]:
+        """Get the appropriate adapter for a given URL"""
+        parsed = urlparse(url)
+        hostname = parsed.netloc.lower()
+        
+        # Remove www. prefix if present
+        if hostname.startswith('www.'):
+            hostname = hostname[4:]
+        
+        # Try exact hostname match
+        if hostname in self.adapters:
+            return self._create_adapter(hostname)
+        
+        # Try domain suffix match (e.g., subdomain.example.com -> example.com)
+        parts = hostname.split('.')
+        if len(parts) > 2:
+            domain = '.'.join(parts[-2:])
+            if domain in self.adapters:
+                return self._create_adapter(domain)
+        
+        return None
+    
+    def _create_adapter(self, domain: str) -> BaseAdapter:
+        """Create an adapter instance for the given domain"""
+        config = self.adapters[domain]
+        
+        # Use custom implementation if available
+        if domain in self.custom_adapters:
+            return self.custom_adapters[domain](config)
+        
+        # Otherwise use generic adapter
+        from .generic import GenericAdapter
+        return GenericAdapter(config)
+
+# adapters/generic.py
+from typing import List, Dict, Any
+from .base import BaseAdapter
+from bs4 import BeautifulSoup
+import re
+import dateparser
+
+class GenericAdapter(BaseAdapter):
+    def extract_events(self, url: str, html_content: str) -> List[Dict[str, Any]]:
+        """Extract events using configured selectors"""
+        events = []
+        soup = BeautifulSoup(html_content, 'html.parser')
+        
+        # Extract event containers
+        container_selector = self.selectors.get('event_container')
+        if not container_selector:
+            return []
+        
+        containers = soup.select(container_selector)
+        
+        for container in containers:
+            event = {}
+            
+            # Extract title
+            title_selector = self.selectors.get('title')
+            if title_selector:
+                title_elem = container.select_one(title_selector)
+                if title_elem:
+                    event['title'] = title_elem.get_text(strip=True)
+            
+            # Extract date
+            date_selector = self.selectors.get('date')
+            if date_selector:
+                date_elem = container.select_one(date_selector)
+                if date_elem:
+                    date_text = date_elem.get_text(strip=True)
+                    parsed_date = self._parse_date(date_text)
+                    if parsed_date:
+                        event['startDate'] = parsed_date.isoformat()
+            
+            # Extract venue
+            venue_selector = self.selectors.get('venue')
+            if venue_selector:
+                venue_elem = container.select_one(venue_selector)
+                if venue_elem:
+                    event['venue'] = venue_elem.get_text(strip=True)
+            
+            # Extract description
+            desc_selector = self.selectors.get('description')
+            if desc_selector:
+                desc_elem = container.select_one(desc_selector)
+                if desc_elem:
+                    event['description'] = desc_elem.get_text(strip=True)
+            
+            # Extract URL
+            url_selector = self.selectors.get('url')
+            if url_selector:
+                url_elem = container.select_one(url_selector)
+                if url_elem and url_elem.name == 'a' and url_elem.get('href'):
+                    event['url'] = url_elem['href']
+            
+            # Extract image
+            image_selector = self.selectors.get('image')
+            if image_selector:
+                img_elem = container.select_one(image_selector)
+                if img_elem and img_elem.get('src'):
+                    event['imageUrl'] = img_elem['src']
+            
+            if 'title' in event:  # Only add if we have at least a title
+                events.append(event)
+        
+        return events
+    
+    def _parse_date(self, date_text: str) -> Optional[datetime]:
+        """Parse date string using configured formats"""
+        # Try configured date formats first
+        for date_format in self.date_formats:
+            try:
+                from datetime import datetime
+                return datetime.strptime(date_text, date_format)
+            except ValueError:
+                continue
+        
+        # Fall back to dateparser
+        return dateparser.parse(date_text)
+```
+
+# Test Strategy:
+1. Unit tests for base adapter functionality
+2. Test adapter registry with mock configurations
+3. Test URL matching and adapter selection
+4. Test generic adapter with various HTML structures
+5. Test date parsing with different formats
+6. Test pagination handling
+7. Integration tests with sample adapter configurations

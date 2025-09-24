@@ -1,0 +1,138 @@
+- **Separation of Concerns by Feature Folder**
+
+  - Each subfolder under `apps/portal/convex/` must represent a single domain/feature (e.g., `ecommerce/chargebacks`, `socialfeed/comments`).
+  - Each feature subfolder must contain:
+    - `schema.ts` for `defineTable(...)` declarations and table-level indexes only
+    - `queries.ts` for public `query({...})`
+    - `mutations.ts` for public `mutation({...})`
+    - `helpers.ts` optional for pure/shared helper functions (no Convex runtime calls)
+  - Do not mix unrelated domain logic in the same folder.
+
+- **Schema Aggregation Pattern (No defineSchema outside the root)**
+  - `defineSchema(...)` must be used only once in `[schema.ts](mdc:apps/portal/convex/schema.ts)`.
+  - All other schema files must export plain objects that collect `defineTable(...)` results.
+  - Feature roots should aggregate nested `schema.ts` via object spreads and export the object (not a defined schema). Example:
+
+```ts
+// apps/portal/convex/ecommerce/schema.ts
+import { balancesSchema } from "./balances/schema";
+import { cartSchema } from "./cart/schema";
+import { categoriesSchema } from "./categories/schema";
+import { chargebacksSchemaExport as chargebacksSchema } from "./chargebacks/schema";
+import { couponsSchema } from "./coupons/schema";
+import { funnelsSchema } from "./funnels/schema";
+import { ordersSchema } from "./orders/schema";
+import { paymentMethodsSchema } from "./payments/schema";
+import { productReviewsSchema } from "./productReviews/schema";
+import { productsSchema } from "./products/schema";
+import { shippingMethodsSchema } from "./shippingMethods/schema";
+import { subscriptionsSchema } from "./subscriptions/schema";
+import { taxRatesSchema } from "./taxRates/schema";
+import { transactionsSchema } from "./transactions/schema";
+import { wishlistSchema } from "./wishlist/schema";
+
+export const ecommerceSchema = {
+  ...cartSchema,
+  ...productsSchema,
+  ...categoriesSchema,
+  ...ordersSchema,
+  ...transactionsSchema,
+  ...subscriptionsSchema,
+  ...wishlistSchema,
+  ...productReviewsSchema,
+  ...paymentMethodsSchema,
+  ...shippingMethodsSchema,
+  ...taxRatesSchema,
+  ...couponsSchema,
+  ...funnelsSchema,
+  ...chargebacksSchema,
+  ...balancesSchema,
+};
+```
+
+- **Query/Mutation Colocation and Imports**
+
+  - Place `queries.ts` and `mutations.ts` alongside `schema.ts` in each feature folder.
+  - Import these directly from their folder path when used; do not add `index.ts` files to re-export queries/mutations.
+
+- **Convex Calls: No Query→Query or Mutation→Mutation**
+
+  - A Convex `query` or `mutation` must not call another Convex `query`/`mutation` as a proxy during refactors.
+  - If logic needs sharing, move it to `helpers.ts` (pure functions) and call directly from both endpoints.
+  - Only use `ctx.runAction` for cross-runtime Node actions as appropriate; otherwise call shared helpers.
+
+- **Return Validators and Inference Stability**
+
+  - Always provide explicit `returns: ...` validators for all Convex functions to prevent deep/infinite type instantiation.
+  - When referencing other endpoints (e.g., via `api.*`) that can trigger circular inference, add explicit handler return types.
+
+- **Folder Structure Example**
+
+```text
+apps/portal/convex/
+  ecommerce/
+    cart/
+      schema.ts
+      queries.ts
+      mutations.ts
+      helpers.ts
+    chargebacks/
+      schema.ts
+      queries.ts
+      mutations.ts
+    schema.ts        // aggregates feature schemas (object only)
+  socialfeed/
+    comments/
+      schema.ts
+      queries.ts
+      mutations.ts
+    hashtags/
+      schema.ts
+      queries.ts
+      mutations.ts
+    schema.ts        // aggregates feature schemas (object only)
+  schema.ts          // ONLY place that calls defineSchema(...)
+```
+
+- **DO / DON'T**
+
+```ts
+// ✅ DO: Feature schema exports only defineTable collections
+export const commentsSchema = { comments: defineTable({...}) };
+
+// ❌ DON'T: Call defineSchema in a feature schema file
+export default defineSchema({ /* not allowed here */ });
+
+// ✅ DO: Colocate feature queries/mutations
+// ecommerce/cart/queries.ts, ecommerce/cart/mutations.ts
+
+// ❌ DON'T: Create index.ts to re-export queries/mutations
+// Avoid barrel files that obscure import paths.
+
+// ✅ DO: Use return validators and explicit handler return types when needed
+export const list = query({
+  args: {},
+  returns: v.array(v.object({ _id: v.id("comments"), _creationTime: v.number(), content: v.string() })),
+  handler: async (ctx) => { /* ... */ },
+});
+
+// ❌ DON'T: Proxy a query by calling another Convex query from a query
+export const badProxy = query({
+  args: {},
+  handler: async (ctx) => ctx.runQuery(api.other.getStuff, {}), // not allowed
+});
+```
+
+- **Refactor Guidance**
+
+  - When reorganizing Convex folders to this structure, also update frontend calls to point to the new endpoints directly.
+  - Remove transitional proxy endpoints and route callers to their final `queries.ts`/`mutations.ts`.
+
+- **References**
+  - Root schema: [schema.ts](mdc:apps/portal/convex/schema.ts)
+  - Example feature aggregation (ecommerce): create or maintain `apps/portal/convex/ecommerce/schema.ts` exporting a plain object composed of nested feature `schema.ts`.
+    description:
+    globs:
+    alwaysApply: false
+
+---

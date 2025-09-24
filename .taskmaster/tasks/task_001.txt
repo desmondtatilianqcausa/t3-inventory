@@ -1,0 +1,28 @@
+# Task ID: 1
+# Title: Extend Convex Data Model for Event Metadata
+# Status: pending
+# Dependencies: None
+# Priority: high
+# Description: Update the Convex data model to support richer event metadata including new fields and indexes.
+# Details:
+Modify the Convex schema to add the following fields to the `events` table:
+- slug (string, unique)
+- ticketUrl (string)
+- venue (string)
+- address (string)
+- city (string)
+- state (string)
+- timeZone (string)
+- price (number)
+- isFree (boolean)
+- isSoldOut (boolean)
+- images (string[])
+
+Create new indexes:
+- Add index by `slug`
+- Add index by `startAt`
+
+Update validation in the `events.create` mutation to accept and validate these new fields. Ensure slug uniqueness is enforced at the database level.
+
+# Test Strategy:
+Write unit tests for the schema changes. Test the uniqueness constraint on slug field. Verify that existing queries still work with the updated schema. Test the new indexes with sample queries to ensure they improve performance.

@@ -1,0 +1,142 @@
+# Task ID: 10
+# Title: Implement Add to Calendar Functionality
+# Status: pending
+# Dependencies: 7
+# Priority: medium
+# Description: Create an 'Add to Calendar' button with options for different calendar services and ICS download.
+# Details:
+Create a server route to generate ICS files dynamically:
+
+```typescript
+// app/api/calendar/[eventId]/route.ts
+import { NextResponse } from 'next/server';
+import { getEvent } from '@/lib/convex';
+import { createEvent } from 'ics';
+
+export async function GET(request, { params }) {
+  const event = await getEvent(params.eventId);
+  if (!event) {
+    return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+  }
+  
+  const startDate = new Date(event.startAt);
+  const endDate = new Date(event.endAt);
+  
+  const icsEvent = {
+    start: [startDate.getFullYear(), startDate.getMonth() + 1, startDate.getDate(), startDate.getHours(), startDate.getMinutes()],
+    end: [endDate.getFullYear(), endDate.getMonth() + 1, endDate.getDate(), endDate.getHours(), endDate.getMinutes()],
+    title: event.title,
+    description: event.description,
+    location: `${event.venue}, ${event.address}, ${event.city}, ${event.state}`,
+    url: `https://yourdomain.com/event/${event.slug}`,
+    status: 'CONFIRMED',
+  };
+  
+  return new Promise((resolve) => {
+    createEvent(icsEvent, (error, value) => {
+      if (error) {
+        resolve(NextResponse.json({ error: 'Failed to create ICS file' }, { status: 500 }));
+        return;
+      }
+      
+      resolve(new NextResponse(value, {
+        headers: {
+          'Content-Type': 'text/calendar',
+          'Content-Disposition': `attachment; filename="${event.slug}.ics"`,
+        },
+      }));
+    });
+  });
+}
+```
+
+Implement the Add to Calendar component:
+
+```tsx
+import { useState } from 'react';
+
+const AddToCalendar = ({ event }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  
+  const trackCalendarAdd = (provider) => {
+    // Analytics tracking code
+    console.log(`Calendar add: ${provider}`, event.id);
+  };
+  
+  const formatDateForGoogle = (date) => {
+    return new Date(date).toISOString().replace(/-|:|\.\d+/g, '');
+  };
+  
+  const getGoogleCalendarUrl = () => {
+    const start = formatDateForGoogle(event.startAt);
+    const end = formatDateForGoogle(event.endAt);
+    const details = encodeURIComponent(event.description);
+    const location = encodeURIComponent(`${event.venue}, ${event.address}, ${event.city}, ${event.state}`);
+    const title = encodeURIComponent(event.title);
+    
+    return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${start}/${end}&details=${details}&location=${location}`;  
+  };
+  
+  const getOutlookCalendarUrl = () => {
+    // Similar to Google but with Outlook format
+    // ...
+  };
+  
+  const getIcsDownloadUrl = () => {
+    return `/api/calendar/${event.id}`;
+  };
+  
+  return (
+    <div className="relative">
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center space-x-2 text-gray-600 hover:text-gray-900"
+        aria-expanded={isOpen}
+        aria-haspopup="true"
+      >
+        <CalendarIcon className="w-5 h-5" />
+        <span>Add to Calendar</span>
+      </button>
+      
+      {isOpen && (
+        <div className="absolute z-10 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5">
+          <div className="py-1" role="menu" aria-orientation="vertical">
+            <a
+              href={getGoogleCalendarUrl()}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => trackCalendarAdd('google')}
+              className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              role="menuitem"
+            >
+              Google Calendar
+            </a>
+            <a
+              href={getOutlookCalendarUrl()}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => trackCalendarAdd('outlook')}
+              className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              role="menuitem"
+            >
+              Outlook Calendar
+            </a>
+            <a
+              href={getIcsDownloadUrl()}
+              download={`${event.slug}.ics`}
+              onClick={() => trackCalendarAdd('ics')}
+              className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              role="menuitem"
+            >
+              Download ICS
+            </a>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+```
+
+# Test Strategy:
+Test the Add to Calendar functionality with various calendar services. Verify that the ICS file is generated correctly and can be imported into calendar applications. Test the dropdown menu behavior and ensure it's accessible via keyboard. Verify that analytics tracking functions are called when calendar options are selected.

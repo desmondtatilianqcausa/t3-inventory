@@ -1,0 +1,46 @@
+# Task ID: 1
+# Title: Setup Python Scraper Service
+# Status: pending
+# Dependencies: None
+# Priority: high
+# Description: Create a Python scraper service using FastAPI that wraps ScrapeGraphAI and provides endpoints for event scraping.
+# Details:
+1. Initialize a Python project with FastAPI
+2. Set up project structure with routes, models, and services
+3. Create a POST /scrape/events endpoint that accepts {url, cityId, city, state}
+4. Configure Ollama integration with llama3 model
+5. Implement configuration for model, base_url, num_ctx, user-agent, retries/timeouts
+6. Set up Docker configuration for local development
+7. Add basic error handling and logging
+
+Example endpoint implementation:
+```python
+@app.post('/scrape/events')
+async def scrape_events(request: EventScrapeRequest):
+    try:
+        # Initialize scraper with config
+        scraper = EventScraper(config)
+        
+        # Run scraping job
+        results = await scraper.scrape(request.url, request.cityId, request.city, request.state)
+        
+        # Return results
+        return {
+            'status': 'success',
+            'jobId': results.job_id,
+            'candidates': results.candidates
+        }
+    except Exception as e:
+        logger.error(f"Scraping error: {str(e)}")
+        return {
+            'status': 'error',
+            'message': str(e)
+        }
+```
+
+# Test Strategy:
+1. Unit tests for service initialization and configuration
+2. Integration tests with mock responses for the scraper endpoint
+3. Test error handling with invalid inputs
+4. Verify correct response format
+5. Manual testing with curl/Postman to ensure the endpoint is accessible

@@ -1,0 +1,7 @@
+import { query } from "../_generated/server";
+import { v } from "convex/values";
+
+export const getById = query({
+  args: { id: v.id("users") },
+  handler: async (ctx, { id }) => ctx.db.get(id),
+});

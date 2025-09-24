@@ -1,0 +1,54 @@
+# Task ID: 15
+# Title: Implement Accessibility Enhancements
+# Status: pending
+# Dependencies: 7, 8, 9, 10, 11, 12, 13
+# Priority: high
+# Description: Ensure the event page is fully accessible with proper labels, keyboard navigation, and focus management.
+# Details:
+Implement the following accessibility enhancements:
+
+1. Ensure all interactive elements have proper ARIA attributes
+2. Add skip links for keyboard navigation
+3. Ensure proper focus management for modals and dropdowns
+4. Add appropriate alt text for images
+5. Ensure sufficient color contrast for text and UI elements
+6. Make external links announce they open in new tabs
+
+Example implementation for external links:
+
+```tsx
+const ExternalLink = ({ href, children, className, ...props }) => {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={className}
+      {...props}
+    >
+      {children}
+      <span className="sr-only">(opens in new tab)</span>
+    </a>
+  );
+};
+```
+
+Implement a skip link at the top of the page:
+
+```tsx
+const SkipLink = () => {
+  return (
+    <a
+      href="#main-content"
+      className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 z-50 bg-white p-4 rounded shadow"
+    >
+      Skip to main content
+    </a>
+  );
+};
+```
+
+Ensure all form controls have associated labels and all images have alt text. Use semantic HTML elements throughout the application.
+
+# Test Strategy:
+Run accessibility audits using tools like Axe or Lighthouse. Test keyboard navigation through the entire page. Verify that screen readers can properly announce all content and interactive elements. Test with high contrast mode and zoom settings.

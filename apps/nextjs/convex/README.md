@@ -88,3 +88,24 @@ function handleButtonPress() {
 Use the Convex CLI to push your functions to a deployment. See everything
 the Convex CLI can do by running `npx convex -h` in your project root
 directory. To learn more, launch the docs with `npx convex docs`.
+
+# Convex Setup
+
+- Dev run (one-off apply):
+
+```
+npx convex dev --once
+```
+
+- Dashboard:
+
+```
+npx convex dash
+```
+
+## Tables
+- users: firstName, lastName, email (idx), tel, roles[]
+- formResponses: data, createdAt, createdById (idx), mondayItemId, status (idx), processingStatus, processingMeta
+- products: name, description, quantity, price, category (idx), createdAt
+- userRoles: userId (idx), role (idx)
+- logs: ts (idx), level (idx), message, meta

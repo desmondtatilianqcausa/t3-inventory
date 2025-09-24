@@ -1,30 +1,34 @@
 "use client";
 
+import * as React from "react";
+
+import {
+  Controller,
+  useForm as __useForm,
+  useFormContext,
+} from "react-hook-form";
 import type {
   ControllerProps,
   FieldPath,
   FieldValues,
   UseFormProps,
 } from "react-hook-form";
-import type { ZodType } from "zod/v4";
-import * as React from "react";
-import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
+import type { ZodType, ZodTypeDef } from "zod";
+
+import { Label } from "./components/label";
 import { Slot } from "radix-ui";
-import {
-  useForm as __useForm,
-  Controller,
-  useFormContext,
-} from "react-hook-form";
-
 import { cn } from "@acme/ui";
-
-import { Label } from "./label";
+import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 
 export { FormProvider as Form, useFieldArray } from "react-hook-form";
 
-export function useForm<TOut extends FieldValues, TIn extends FieldValues>(
-  props: Omit<UseFormProps<TIn, unknown, TOut>, "resolver"> & {
-    schema: ZodType<TOut, TIn>;
+export function useForm<
+  TOut extends FieldValues,
+  TDef extends ZodTypeDef,
+  TIn extends FieldValues,
+>(
+  props: Omit<UseFormProps<TIn>, "resolver"> & {
+    schema: ZodType<TOut, TDef, TIn>;
   },
 ) {
   const form = __useForm<TIn, unknown, TOut>({

@@ -6,7 +6,11 @@
     "baseUrl": ".",
     "paths": {
       "~/*": ["./src/*"],
-      "@workspace/ui/*": ["../../packages/ui/src/*"]
+      "@/*": ["./src/*"],
+      "@/components/*": ["./src/app/_components/*"],
+      "@acme/ui/*": ["../../packages/ui/src/*"],
+      "@acme/activepieces-ui/*": ["../../packages/activepieces-ui/dist/src/*"],
+      "@/convex/*": ["./convex/*"]
     },
     "plugins": [{ "name": "next" }],
     "module": "esnext"

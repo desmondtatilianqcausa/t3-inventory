@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "declaration": true,
+    "emitDeclarationOnly": false,
+    "noEmit": false,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "resolveJsonModule": true,
+    "jsx": "react-jsx"
+  },
+  "include": [
+    "src/app/builder/**/*",
+    "src/components/**/*",
+    "src/features/**/*",
+    "src/hooks/**/*",
+    "src/lib/**/*"
+  ],
+  "exclude": ["src/app/routes/**"]
+}

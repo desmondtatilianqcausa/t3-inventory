@@ -1,0 +1,277 @@
+# Task ID: 8
+# Title: Create Candidate Review UI
+# Status: pending
+# Dependencies: 3, 4, 5
+# Priority: high
+# Description: Build a Next.js component for reviewing and approving/ignoring event candidates.
+# Details:
+Create a React component for reviewing event candidates:
+
+1. List view of candidates with key information
+2. Detail view with all extracted data
+3. Business matcher with fuzzy search
+4. Category selection
+5. Approve/ignore actions
+
+Example implementation:
+```tsx
+// components/admin/EventCandidateReview.tsx
+import { useState, useEffect } from 'react';
+import { useQuery, useMutation } from 'convex/react';
+import { api } from '../../convex/_generated/api';
+import { useRouter } from 'next/router';
+
+export default function EventCandidateReview() {
+  const router = useRouter();
+  const { jobId } = router.query;
+  
+  const [selectedCandidate, setSelectedCandidate] = useState(null);
+  const [selectedBusinessId, setSelectedBusinessId] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategories, setSelectedCategories] = useState([]);
+  
+  const candidates = useQuery(api.eventCandidates.listByJob, { jobId: jobId as string }) || [];
+  const businesses = useQuery(api.businesses.search, { query: searchTerm }) || [];
+  const categories = useQuery(api.categories.list) || [];
+  
+  const approveCandidate = useMutation(api.actions.events.approveCandidate);
+  const ignoreCandidate = useMutation(api.eventCandidates.ignore);
+  
+  // Reset business search when candidate changes
+  useEffect(() => {
+    if (selectedCandidate) {
+      setSearchTerm(selectedCandidate.venue || '');
+    } else {
+      setSearchTerm('');
+    }
+    setSelectedBusinessId('');
+  }, [selectedCandidate]);
+  
+  const handleApprove = async () => {
+    if (!selectedCandidate || !selectedBusinessId) return;
+    
+    try {
+      await approveCandidate({
+        candidateId: selectedCandidate._id,
+        businessId: selectedBusinessId,
+        categories: selectedCategories,
+        pricing: 'free', // Default, could be made selectable
+        recurring: false, // Default, could be made selectable
+      });
+      
+      // Clear selection and refresh
+      setSelectedCandidate(null);
+      setSelectedBusinessId('');
+      setSelectedCategories([]);
+    } catch (err) {
+      console.error('Failed to approve candidate:', err);
+    }
+  };
+  
+  const handleIgnore = async () => {
+    if (!selectedCandidate) return;
+    
+    try {
+      await ignoreCandidate({ id: selectedCandidate._id });
+      setSelectedCandidate(null);
+    } catch (err) {
+      console.error('Failed to ignore candidate:', err);
+    }
+  };
+  
+  const toggleCategory = (categoryId) => {
+    setSelectedCategories(prev =>
+      prev.includes(categoryId)
+        ? prev.filter(id => id !== categoryId)
+        : [...prev, categoryId]
+    );
+  };
+  
+  return (
+    <div className="flex h-screen">
+      {/* Candidates List */}
+      <div className="w-1/3 border-r overflow-y-auto p-4">
+        <h2 className="text-xl font-bold mb-4">Event Candidates</h2>
+        
+        {candidates.length === 0 ? (
+          <p className="text-gray-500">No candidates to review.</p>
+        ) : (
+          <div className="space-y-2">
+            {candidates
+              .filter(c => c.status === 'pending')
+              .map((candidate) => (
+                <div
+                  key={candidate._id}
+                  onClick={() => setSelectedCandidate(candidate)}
+                  className={`p-3 rounded cursor-pointer ${selectedCandidate?._id === candidate._id ? 'bg-blue-100' : 'hover:bg-gray-100'}`}
+                >
+                  <h3 className="font-medium">{candidate.title}</h3>
+                  {candidate.startDate && (
+                    <p className="text-sm text-gray-600">
+                      {new Date(candidate.startDate).toLocaleDateString()}
+                    </p>
+                  )}
+                  {candidate.venue && (
+                    <p className="text-sm text-gray-600">{candidate.venue}</p>
+                  )}
+                  <div className="mt-1">
+                    <span className={`text-xs px-2 py-1 rounded ${getConfidenceColor(candidate.confidence)}`}>
+                      {Math.round(candidate.confidence * 100)}% confidence
+                    </span>
+                  </div>
+                </div>
+              ))}
+          </div>
+        )}
+      </div>
+      
+      {/* Detail View */}
+      <div className="w-2/3 p-4 overflow-y-auto">
+        {!selectedCandidate ? (
+          <div className="flex items-center justify-center h-full text-gray-500">
+            Select a candidate to review
+          </div>
+        ) : (
+          <div>
+            <h2 className="text-2xl font-bold mb-4">{selectedCandidate.title}</h2>
+            
+            {/* Event Details */}
+            <div className="mb-6 bg-gray-50 p-4 rounded">
+              {selectedCandidate.startDate && (
+                <div className="mb-2">
+                  <span className="font-medium">Date:</span> 
+                  {new Date(selectedCandidate.startDate).toLocaleString()}
+                  {selectedCandidate.endDate && (
+                    <> to {new Date(selectedCandidate.endDate).toLocaleString()}</>
+                  )}
+                </div>
+              )}
+              
+              {selectedCandidate.venue && (
+                <div className="mb-2">
+                  <span className="font-medium">Venue:</span> {selectedCandidate.venue}
+                </div>
+              )}
+              
+              {selectedCandidate.address && (
+                <div className="mb-2">
+                  <span className="font-medium">Address:</span> {selectedCandidate.address}
+                </div>
+              )}
+              
+              {selectedCandidate.description && (
+                <div className="mb-2">
+                  <span className="font-medium">Description:</span>
+                  <div className="mt-1 text-sm">{selectedCandidate.description}</div>
+                </div>
+              )}
+              
+              {selectedCandidate.url && (
+                <div className="mb-2">
+                  <span className="font-medium">URL:</span> 
+                  <a href={selectedCandidate.url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
+                    {selectedCandidate.url}
+                  </a>
+                </div>
+              )}
+              
+              {selectedCandidate.imageUrl && (
+                <div className="mb-2">
+                  <span className="font-medium">Image:</span>
+                  <img src={selectedCandidate.imageUrl} alt="Event" className="mt-1 max-w-xs rounded" />
+                </div>
+              )}
+              
+              <div className="mt-2 text-sm text-gray-500">
+                Extracted via: {selectedCandidate.extractionMethod}
+              </div>
+            </div>
+            
+            {/* Business Matching */}
+            <div className="mb-6">
+              <h3 className="text-lg font-medium mb-2">Match to Business</h3>
+              
+              <div className="mb-4">
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Search businesses..."
+                  className="w-full p-2 border rounded"
+                />
+              </div>
+              
+              <div className="max-h-40 overflow-y-auto border rounded">
+                {businesses.length === 0 ? (
+                  <p className="p-2 text-gray-500">No businesses found</p>
+                ) : (
+                  businesses.map((business) => (
+                    <div
+                      key={business._id}
+                      onClick={() => setSelectedBusinessId(business._id)}
+                      className={`p-2 cursor-pointer ${selectedBusinessId === business._id ? 'bg-blue-100' : 'hover:bg-gray-100'}`}
+                    >
+                      <div className="font-medium">{business.name}</div>
+                      <div className="text-sm text-gray-600">{business.address}</div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+            
+            {/* Categories */}
+            <div className="mb-6">
+              <h3 className="text-lg font-medium mb-2">Categories</h3>
+              
+              <div className="flex flex-wrap gap-2">
+                {categories.map((category) => (
+                  <button
+                    key={category._id}
+                    onClick={() => toggleCategory(category._id)}
+                    className={`px-3 py-1 rounded text-sm ${selectedCategories.includes(category._id) ? 'bg-blue-500 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}
+                  >
+                    {category.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            {/* Actions */}
+            <div className="flex space-x-4">
+              <button
+                onClick={handleApprove}
+                disabled={!selectedBusinessId}
+                className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50"
+              >
+                Approve & Create Event
+              </button>
+              
+              <button
+                onClick={handleIgnore}
+                className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+              >
+                Ignore
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function getConfidenceColor(confidence) {
+  if (confidence >= 0.8) return 'bg-green-100 text-green-800';
+  if (confidence >= 0.5) return 'bg-yellow-100 text-yellow-800';
+  return 'bg-red-100 text-red-800';
+}
+```
+
+# Test Strategy:
+1. Unit tests for component rendering
+2. Test business search functionality
+3. Test category selection
+4. Test approve and ignore actions with mock mutations
+5. Test with various candidate data
+6. User acceptance testing with admin users
+7. Test responsive design for different screen sizes

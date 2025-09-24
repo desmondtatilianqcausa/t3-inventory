@@ -1,0 +1,34 @@
+# Task ID: 3
+# Title: Implement Convex Query for getBySlug
+# Status: pending
+# Dependencies: 1
+# Priority: high
+# Description: Create a new Convex query to fetch event details by slug instead of ID.
+# Details:
+Create a new query function `events.getBySlug` that:
+- Accepts a slug parameter
+- Uses the new slug index to efficiently retrieve the event
+- Returns the complete event object with all fields
+- Handles the case when no event is found with the given slug
+
+Example implementation:
+```typescript
+export const getBySlug = query({
+  args: { slug: v.string() },
+  handler: async (ctx, args) => {
+    const event = await ctx.db
+      .query('events')
+      .withIndex('by_slug', q => q.eq('slug', args.slug))
+      .unique();
+    
+    if (!event) {
+      throw new Error(`Event with slug ${args.slug} not found`);
+    }
+    
+    return event;
+  },
+});
+```
+
+# Test Strategy:
+Write unit tests for the getBySlug query. Test with valid slugs, invalid slugs, and edge cases. Verify that the query returns the correct event data when a valid slug is provided and handles errors appropriately when no matching event is found.
