@@ -107,7 +107,11 @@ type OrderFormValues = {
   status?: OrderStatus;
   eventId?: string;
   createdById?: string;
-  items: Array<{ productId?: Id<"products">; quantity: number }>;
+  items: Array<{
+    productId?: Id<"products">;
+    quantity: number;
+    checkinQuantity?: number;
+  }>;
   mondayItemId?: string;
 };
 
@@ -149,6 +153,7 @@ export default function OrderForm({ orderId }: { orderId?: string }) {
     },
   });
   const { control, watch } = form;
+  const statusValue = watch("status");
   const { fields, append, remove } = useFieldArray({ control, name: "items" });
 
   const [open, setOpen] = useState(false);
@@ -239,7 +244,11 @@ export default function OrderForm({ orderId }: { orderId?: string }) {
   };
 
   const persistLineItems = async (
-    all: Array<{ productId: Id<"products">; quantity: number }>,
+    all: Array<{
+      productId: Id<"products">;
+      quantity: number;
+      checkinQuantity?: number;
+    }>,
   ) => {
     const id = await ensureOrderId();
     const prepared = all
@@ -247,6 +256,11 @@ export default function OrderForm({ orderId }: { orderId?: string }) {
       .map((it) => ({
         productId: it.productId,
         quantity: Number(it.quantity),
+        checkinQuantity:
+          typeof (it as { checkinQuantity?: number }).checkinQuantity ===
+          "number"
+            ? Number((it as { checkinQuantity?: number }).checkinQuantity)
+            : undefined,
       }));
     await setLineItems({ orderId: id, items: prepared });
   };
@@ -417,7 +431,7 @@ export default function OrderForm({ orderId }: { orderId?: string }) {
     },
     {
       accessorKey: "quantity",
-      header: "Qty",
+      header: statusValue === "Check-Out" ? "Checkout Qty" : "Qty",
       cell: ({ row }) => (
         <Input
           type="number"
@@ -437,6 +451,35 @@ export default function OrderForm({ orderId }: { orderId?: string }) {
         headerClassName: "min-w-28",
       },
     },
+    // Conditionally render Check-in quantity column when status is Check-Out
+    ...(statusValue === "Check-Out" || statusValue === "Check-In"
+      ? [
+          {
+            id: "checkinQuantity",
+            header: "Check-in Qty",
+            cell: ({ row }: { row: { original: { idx: number } } }) => (
+              <Input
+                type="number"
+                className="w-20"
+                value={Number(
+                  (form.getValues(
+                    `items.${row.original.idx}.checkinQuantity` as const,
+                  ) as unknown as number | undefined) ?? 0,
+                )}
+                onChange={(e) =>
+                  form.setValue(
+                    `items.${row.original.idx}.checkinQuantity` as const,
+                    parseInt(e.target.value || "0"),
+                  )
+                }
+                min={0}
+                disabled={!(statusValue === "Check-Out")}
+              />
+            ),
+            meta: { headerClassName: "min-w-28" },
+          } as const,
+        ]
+      : []),
     {
       id: "subtotal",
       header: "Subtotal",
@@ -510,6 +553,11 @@ export default function OrderForm({ orderId }: { orderId?: string }) {
       .map((it) => ({
         productId: it.productId!,
         quantity: Number(it.quantity),
+        checkinQuantity:
+          typeof (it as { checkinQuantity?: number }).checkinQuantity ===
+          "number"
+            ? Number((it as { checkinQuantity?: number }).checkinQuantity)
+            : undefined,
       }));
     await setLineItems({ orderId: targetId, items: prepared });
   };

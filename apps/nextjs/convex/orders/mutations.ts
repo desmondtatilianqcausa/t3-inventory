@@ -197,6 +197,7 @@ export const setLineItems = mutation({
       v.object({
         productId: v.id("products"),
         quantity: v.number(),
+        checkinQuantity: v.optional(v.number()),
       }),
     ),
   },
@@ -229,6 +230,7 @@ export const setLineItems = mutation({
         productName,
         unitPrice,
         quantity: item.quantity,
+        checkinQuantity: item.checkinQuantity,
         createdAt: now,
       });
 

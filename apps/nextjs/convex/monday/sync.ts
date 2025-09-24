@@ -137,7 +137,11 @@ export const syncOrderToMonday = action({
       );
       const subColumns: Record<string, unknown> = {};
       if (status === "Check-In") {
-        if (checkinCol) subColumns[checkinCol] = li.quantity;
+        if (checkinCol)
+          subColumns[checkinCol] =
+            typeof li.checkinQuantity === "number"
+              ? li.checkinQuantity
+              : li.quantity;
       } else {
         if (checkoutCol) subColumns[checkoutCol] = li.quantity;
       }
@@ -160,7 +164,8 @@ export const syncOrderToMonday = action({
             parentItemId: mondayItemId,
           });
           const match = (subs ?? []).find(
-            (s) => (s.name ?? "") === (titleCandidate ?? ""),
+            (s: { id?: string; name?: string }) =>
+              (s.name ?? "") === (titleCandidate ?? ""),
           );
           existingSubId = match?.id;
         }

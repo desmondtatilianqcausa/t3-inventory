@@ -9,6 +9,24 @@ await jiti.import("./src/env");
 /** @type {import("next").NextConfig} */
 const config = {
   /** Enables hot reloading for local packages without a build step */
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          {
+            key: "X-Frame-Options",
+            value: "ALLOW-FROM https://*.monday.com",
+          },
+          {
+            key: "Content-Security-Policy",
+            value: "frame-ancestors https://*.monday.com https://monday.com;",
+          },
+        ],
+      },
+    ];
+  },
+
   transpilePackages: [
     "@acme/api",
     "@acme/auth",

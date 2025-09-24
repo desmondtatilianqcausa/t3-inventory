@@ -1,5 +1,6 @@
-import { query } from "../_generated/server";
 import { v } from "convex/values";
+
+import { query } from "../_generated/server";
 
 const orderDoc = v.object({
   _id: v.id("orders"),
@@ -25,6 +26,7 @@ const lineItemDoc = v.object({
   productName: v.optional(v.string()),
   unitPrice: v.optional(v.number()),
   quantity: v.number(),
+  checkinQuantity: v.optional(v.number()),
   mondaySubitemId: v.optional(v.string()),
   createdAt: v.number(),
   updatedAt: v.optional(v.number()),

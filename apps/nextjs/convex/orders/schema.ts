@@ -34,6 +34,8 @@ export const orderLineItems = defineTable({
   productName: v.optional(v.string()), // denormalized name snapshot
   unitPrice: v.optional(v.number()), // denormalized price snapshot
   quantity: v.number(),
+  // New: optional check-in quantity captured at check-in time
+  checkinQuantity: v.optional(v.number()),
   // Monday.com subitem linkage
   mondaySubitemId: v.optional(v.string()),
   // Timestamps
