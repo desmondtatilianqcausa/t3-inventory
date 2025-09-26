@@ -174,7 +174,7 @@ export default function OrderPage({}: Props) {
         // (DataTable renders filterComponent under the header controls).
         onAddNew={async () => {
           const id = await createOrder({
-            createdById: "seed-user",
+            createdById: "seed-user@gmail.com",
             status: "Draft",
           });
           router.push(`/admin/orders/${String(id)}`);

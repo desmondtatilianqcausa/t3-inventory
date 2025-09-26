@@ -1,5 +1,11 @@
 "use client";
 
+import type { Id } from "@/convex/_generated/dataModel";
+import { useEffect, useRef, useState } from "react";
+import { api } from "@/convex/_generated/api";
+import { useMutation, useQuery } from "convex/react";
+import { useForm } from "react-hook-form";
+
 import {
   Form,
   FormControl,
@@ -8,15 +14,9 @@ import {
   FormLabel,
   FormMessage,
 } from "~/app/_components/ui/form";
-import { useEffect, useRef, useState } from "react";
-import { useMutation, useQuery } from "convex/react";
-
 import { Button } from "../../../_components/ui/button";
 import { Checkbox } from "../../../_components/ui/checkbox";
-import type { Id } from "@/convex/_generated/dataModel";
 import { Input } from "../../../_components/ui/input";
-import { api } from "@/convex/_generated/api";
-import { useForm } from "react-hook-form";
 
 type EventFormValues = {
   title: string;
@@ -110,14 +110,17 @@ export default function EventForm({ eventId }: { eventId?: string }) {
     if (eventId) {
       await update({
         id: eventId as Id<"events">,
-        createdById: existing?.createdById ?? "seed-user",
+        createdById: existing?.createdById ?? "seed-user@gmail.com",
         ...values,
       });
       if (fileInputRef.current?.files?.[0]) {
         await uploadFeaturedImage(eventId as Id<"events">);
       }
     } else {
-      const newId = await create({ createdById: "seed-user", ...values });
+      const newId = await create({
+        createdById: "seed-user@gmail.com",
+        ...values,
+      });
       if (fileInputRef.current?.files?.[0]) {
         await uploadFeaturedImage(newId);
       }

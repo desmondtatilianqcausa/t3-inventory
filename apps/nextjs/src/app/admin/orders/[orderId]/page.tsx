@@ -23,6 +23,14 @@ function HeaderSave() {
       );
   }, []);
 
+  const showToggle = React.useMemo(() => {
+    return (
+      status === "Draft" ||
+      status === "Awaiting Payment" ||
+      status === "Check-Out"
+    );
+  }, [status]);
+
   const nextLabel = React.useMemo(() => {
     if (status === "Check-Out") return "Check-In";
     return "Check-Out";
@@ -31,8 +39,8 @@ function HeaderSave() {
   const handleToggle = React.useCallback(() => {
     const api = (window as any).__orderFormActions;
     if (!api) return;
-    if (status === "Check-Out") api.setStatusAndSave("Check-In");
-    else api.setStatusAndSave("Check-Out");
+    if (status === "Check-Out") api.confirmAndSetStatus("Check-In");
+    else api.confirmAndSetStatus("Check-Out");
   }, [status]);
 
   React.useEffect(() => {
@@ -54,12 +62,14 @@ function HeaderSave() {
         >
           Save
         </Button>
-        <Button
-          className="bg-blue-700 text-sm font-bold hover:bg-blue-600"
-          onClick={handleToggle}
-        >
-          {nextLabel}
-        </Button>
+        {showToggle && (
+          <Button
+            className="bg-blue-700 text-sm font-bold hover:bg-blue-600"
+            onClick={handleToggle}
+          >
+            {nextLabel}
+          </Button>
+        )}
       </>
     );
     window.dispatchEvent(
@@ -76,7 +86,7 @@ function HeaderSave() {
         new CustomEvent("app:setHeaderActions", { detail: null }),
       );
     };
-  }, [handleToggle, nextLabel, router]);
+  }, [handleToggle, nextLabel, router, showToggle]);
   return null;
 }
 

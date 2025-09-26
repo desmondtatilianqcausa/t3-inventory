@@ -161,7 +161,7 @@ export default function OrderForm({ orderId }: { orderId?: string }) {
       status: "Draft",
       eventId: undefined,
       pickupDropoffLocation: undefined,
-      createdById: "seed-user",
+      createdById: "seed-user@gmail.com",
       mondayItemId: "",
     },
   });
@@ -172,6 +172,8 @@ export default function OrderForm({ orderId }: { orderId?: string }) {
   const [open, setOpen] = useState(false);
   const [imageOpen, setImageOpen] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState<OrderStatus | null>(null);
   const openImage = (url?: string) => {
     if (!url) return;
     setImageUrl(url);
@@ -230,7 +232,7 @@ export default function OrderForm({ orderId }: { orderId?: string }) {
       throw new Error("Event is required");
     }
     const newId = await createOrder({
-      createdById: vals.createdById ?? "seed-user",
+      createdById: vals.createdById ?? "seed-user@gmail.com",
       status: (vals.status as OrderStatus | undefined) ?? undefined,
       eventId: vals.eventId
         ? (vals.eventId as unknown as Id<"events">)
@@ -298,6 +300,15 @@ export default function OrderForm({ orderId }: { orderId?: string }) {
         const formEl = document.querySelector("form") as HTMLFormElement | null;
         formEl?.requestSubmit();
       },
+      confirmAndSetStatus: (nextStatus: OrderStatus) => {
+        const message =
+          nextStatus === "Check-In"
+            ? "Are you sure you want to Check-In this order?"
+            : "Are you sure you want to Check-Out this order?";
+        const ok = window.confirm(message);
+        if (!ok) return;
+        (window as any).__orderFormActions.setStatusAndSave(nextStatus);
+      },
     };
     return () => {
       delete (window as any).__orderFormActions;
@@ -319,7 +330,7 @@ export default function OrderForm({ orderId }: { orderId?: string }) {
         if (mounted && typeof email === "string") {
           (window as any).__mondayUserEmail = email;
           const current = form.getValues("createdById") as string | undefined;
-          if (!current || current === "seed-user") {
+          if (!current || current === "seed-user@gmail.com") {
             form.setValue("createdById", email);
           }
         }
@@ -346,7 +357,7 @@ export default function OrderForm({ orderId }: { orderId?: string }) {
         eventId: (order.eventId as unknown as string | undefined) ?? undefined,
         pickupDropoffLocation: (order as { pickupDropoffLocation?: unknown })
           .pickupDropoffLocation as string | undefined,
-        createdById: order.createdById ?? "seed-user",
+        createdById: order.createdById ?? "seed-user@gmail.com",
         items: [], // load existing items separately if needed
         mondayItemId: (order.mondayItemId as string | undefined) ?? "",
       });
@@ -529,22 +540,41 @@ export default function OrderForm({ orderId }: { orderId?: string }) {
           {
             id: "checkinQuantity",
             header: "Check-in Qty",
-            cell: ({ row }: { row: { original: { idx: number } } }) => (
+            cell: ({
+              row,
+            }: {
+              row: { original: { idx: number; quantity: number } };
+            }) => (
               <Input
                 type="number"
                 className="w-20"
-                value={Number(
-                  (form.getValues(
+                value={(() => {
+                  const v = form.getValues(
                     `items.${row.original.idx}.checkinQuantity` as const,
-                  ) as unknown as number | undefined) ?? 0,
-                )}
-                onChange={(e) =>
+                  ) as unknown as number | undefined;
+                  if (typeof v !== "number" || Number.isNaN(v)) return "";
+                  return String(v);
+                })()}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw === "") {
+                    form.setValue(
+                      `items.${row.original.idx}.checkinQuantity` as const,
+                      undefined as any,
+                    );
+                    return;
+                  }
+                  let n = parseInt(raw || "0");
+                  if (Number.isNaN(n)) n = 0;
+                  const max = row.original.quantity;
+                  const clamped = Math.min(Math.max(0, n), max);
                   form.setValue(
                     `items.${row.original.idx}.checkinQuantity` as const,
-                    parseInt(e.target.value || "0"),
-                  )
-                }
+                    clamped,
+                  );
+                }}
                 min={0}
+                max={row.original.quantity}
                 disabled={!(statusValue === "Check-Out")}
               />
             ),
@@ -599,6 +629,36 @@ export default function OrderForm({ orderId }: { orderId?: string }) {
       toast({ title: "Select an event", description: "Event is required" });
       return;
     }
+    // If checking in, require all check-in quantities to be provided and <= checkout qty
+    if (values.status === "Check-In") {
+      const items = (values.items ?? []) as Array<{
+        quantity: number;
+        checkinQuantity?: number;
+      }>;
+      const missing = items.some(
+        (it) => typeof it.checkinQuantity !== "number",
+      );
+      const exceeds = items.some(
+        (it) =>
+          typeof it.checkinQuantity === "number" &&
+          typeof it.quantity === "number" &&
+          it.checkinQuantity! > it.quantity,
+      );
+      if (missing || exceeds) {
+        // Revert status back to Check-Out to avoid unintended status change
+        form.setValue("status", "Check-Out");
+        toast({
+          title: missing
+            ? "Missing Check-in Quantities"
+            : "Check-in quantity exceeds checkout quantity",
+          description: missing
+            ? "Please enter a Check-in Qty for each line item before checking in."
+            : "Each Check-in Qty must be less than or equal to its Checkout Qty.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
     const eventIdConvex = values.eventId
       ? (values.eventId as unknown as Id<"events">)
       : undefined;
@@ -628,7 +688,7 @@ export default function OrderForm({ orderId }: { orderId?: string }) {
         createdById:
           typeof mondayEmail === "string"
             ? mondayEmail
-            : (values.createdById ?? "seed-user"),
+            : (values.createdById ?? "seed-user@gmail.com"),
         status: values.status ?? undefined,
         eventId: eventIdConvex,
         pickupDropoffLocation: values.pickupDropoffLocation ?? undefined,
@@ -937,23 +997,71 @@ export default function OrderForm({ orderId }: { orderId?: string }) {
                 >
                   Save
                 </Button>
-                <Button
-                  type="button"
-                  className="bg-blue-700 hover:bg-blue-600"
-                  onClick={() => {
-                    const next =
-                      currentStatus === "Check-Out"
-                        ? ("Check-In" as OrderStatus)
-                        : ("Check-Out" as OrderStatus);
-                    form.setValue("status", next);
-                    const formEl = document.querySelector(
-                      "form",
-                    ) as HTMLFormElement | null;
-                    formEl?.requestSubmit();
-                  }}
-                >
-                  {currentStatus === "Check-Out" ? "Check-In" : "Check-Out"}
-                </Button>
+                {(currentStatus === "Draft" ||
+                  currentStatus === "Awaiting Payment" ||
+                  currentStatus === "Check-Out") && (
+                  <>
+                    <Button
+                      type="button"
+                      className="bg-blue-700 hover:bg-blue-600"
+                      onClick={() => {
+                        const next =
+                          currentStatus === "Check-Out"
+                            ? ("Check-In" as OrderStatus)
+                            : ("Check-Out" as OrderStatus);
+                        setPendingStatus(next);
+                        setConfirmOpen(true);
+                      }}
+                    >
+                      {currentStatus === "Check-Out" ? "Check-In" : "Check-Out"}
+                    </Button>
+                    <AlertDialog
+                      open={confirmOpen}
+                      onOpenChange={setConfirmOpen}
+                    >
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>
+                            {pendingStatus === "Check-In"
+                              ? "Confirm Check-In"
+                              : "Confirm Check-Out"}
+                          </AlertDialogTitle>
+                          <AlertDialogDescription>
+                            {pendingStatus === "Check-In"
+                              ? "Are you sure you want to Check-In this order?"
+                              : "Are you sure you want to Check-Out this order?"}
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel
+                            onClick={() => {
+                              setConfirmOpen(false);
+                              setPendingStatus(null);
+                            }}
+                          >
+                            Cancel
+                          </AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => {
+                              if (!pendingStatus) return;
+                              form.setValue("status", pendingStatus);
+                              const formEl = document.querySelector(
+                                "form",
+                              ) as HTMLFormElement | null;
+                              formEl?.requestSubmit();
+                              setConfirmOpen(false);
+                              setPendingStatus(null);
+                            }}
+                          >
+                            {pendingStatus === "Check-In"
+                              ? "Check-In"
+                              : "Check-Out"}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </>
+                )}
                 {/* <Button
                   type="button"
                   className="bg-purple-700 hover:bg-purple-600"
