@@ -1,21 +1,14 @@
 "use client";
 
-import * as React from "react";
-
-import {
-  ArrowUpDown,
-  ChevronDown,
-  ChevronDownIcon,
-  ColumnsIcon,
-  MoreHorizontal,
-  PlusIcon,
-} from "lucide-react";
 import type {
   ColumnDef,
   ColumnFiltersState,
   SortingState,
   VisibilityState,
 } from "@tanstack/react-table";
+import * as React from "react";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -25,6 +18,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -41,11 +36,14 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
+import {
+  ArrowUpDown,
+  ChevronDown,
+  ChevronDownIcon,
+  ColumnsIcon,
+  MoreHorizontal,
+  PlusIcon,
+} from "lucide-react";
 
 // augment ColumnMeta to include headerClassName
 declare module "@tanstack/table-core" {
@@ -129,7 +127,6 @@ export function DataTable<TData>({
       : "") ?? "";
 
   const showSkeletons = isLoading || !data;
-  console.log("[TABLE] showSkeletons", showSkeletons);
 
   return (
     <div className="w-full">

@@ -31,9 +31,12 @@ export const eventDoc = v.object({
   targetSegment: v.optional(v.string()),
   isRecurring: v.optional(v.boolean()),
   updatedAt: v.optional(v.number()),
+  // New: Monday item mapping
+  mondayItemId: v.optional(v.string()),
 });
 
 export const events = defineTable(eventDoc)
   .index("by_slug", ["slug"]) // fetch by slug
   .index("by_creator", ["createdById"]) // list by creator
-  .index("by_startAt", ["startAt"]); // upcoming ordering
+  .index("by_startAt", ["startAt"]) // upcoming ordering
+  .index("by_mondayItemId", ["mondayItemId"]);

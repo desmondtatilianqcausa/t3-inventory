@@ -4,7 +4,7 @@ import { defineSchema } from "convex/server";
 import { events } from "./events/schema";
 import { formResponses } from "./formResponses/schema";
 import { integrationConnections, integrations } from "./integrations/schema";
-import { orderLineItems, orders } from "./orders/schema";
+import { counters, orderLineItems, orders } from "./orders/schema";
 import { productCategories, products } from "./products/schema";
 import { userRoles, users } from "./users/schema";
 import {
@@ -31,4 +31,5 @@ export default defineSchema({
   workflow_versions,
   workflow_runs,
   workflow_steps,
+  counters,
 });

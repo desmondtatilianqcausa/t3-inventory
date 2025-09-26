@@ -15,12 +15,9 @@ const config = {
         source: "/(.*)",
         headers: [
           {
-            key: "X-Frame-Options",
-            value: "ALLOW-FROM https://*.monday.com",
-          },
-          {
             key: "Content-Security-Policy",
-            value: "frame-ancestors https://*.monday.com https://monday.com;",
+            value:
+              "frame-ancestors https://*.monday.com https://monday.com https://*.monday.app;",
           },
         ],
       },

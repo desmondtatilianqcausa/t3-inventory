@@ -110,12 +110,27 @@ export const create = mutation({
     processingStatus: v.optional(v.string()),
     totalQuantity: v.optional(v.number()),
     totalPrice: v.optional(v.number()),
+    pickupDropoffLocation: v.optional(v.string()),
   },
   returns: v.id("orders"),
   handler: async (ctx, args) => {
     const now = Date.now();
+    // Generate next order number (start at 274)
+    const key = "orders";
+    const existingCounter = await ctx.db
+      .query("counters")
+      .withIndex("by_key", (q) => q.eq("key", key))
+      .first();
+    let nextNumber = 274;
+    if (!existingCounter) {
+      await ctx.db.insert("counters", { key, value: nextNumber + 1 });
+    } else {
+      nextNumber = existingCounter.value;
+      await ctx.db.patch(existingCounter._id, { value: nextNumber + 1 });
+    }
     const id = await ctx.db.insert("orders", {
       ...args,
+      orderNumber: nextNumber,
       createdAt: now,
       updatedAt: now,
     });
@@ -133,6 +148,7 @@ export const update = mutation({
     processingStatus: v.optional(v.string()),
     totalQuantity: v.optional(v.number()),
     totalPrice: v.optional(v.number()),
+    pickupDropoffLocation: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, { id, ...rest }) => {
@@ -425,6 +441,45 @@ export const checkin = mutation({
       "monday/inventorySync:syncProductsForOrder" as unknown as FunctionReference<"action">;
     await ctx.scheduler.runAfter(0, invRef, { orderId: id });
 
+    return null;
+  },
+});
+
+export const bulkDelete = mutation({
+  args: { ids: v.array(v.id("orders")) },
+  returns: v.null(),
+  handler: async (ctx, { ids }) => {
+    for (const id of ids) {
+      const items = await ctx.db
+        .query("orderLineItems")
+        .withIndex("by_order", (q) => q.eq("orderId", id))
+        .collect();
+      for (const li of items) {
+        await ctx.db.delete(li._id);
+      }
+      await ctx.db.delete(id);
+    }
+    return null;
+  },
+});
+
+export const removeByMondayItemId = mutation({
+  args: { mondayItemId: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { mondayItemId }) => {
+    const order = await ctx.db
+      .query("orders")
+      .withIndex("by_mondayItemId", (q) => q.eq("mondayItemId", mondayItemId))
+      .first();
+    if (order) {
+      // delete line items
+      const items = await ctx.db
+        .query("orderLineItems")
+        .withIndex("by_order", (q) => q.eq("orderId", order._id))
+        .collect();
+      for (const li of items) await ctx.db.delete(li._id);
+      await ctx.db.delete(order._id);
+    }
     return null;
   },
 });

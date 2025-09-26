@@ -140,6 +140,14 @@ export const columns: ColumnDef<Event>[] = [
       headerClassName: "min-w-40",
     },
   },
+  {
+    accessorKey: "mondayItemId",
+    header: "Monday Item ID",
+    cell: ({ row }) => {
+      const event = row.original;
+      return <div>{event.mondayItemId}</div>;
+    },
+  },
 
   {
     id: "actions",

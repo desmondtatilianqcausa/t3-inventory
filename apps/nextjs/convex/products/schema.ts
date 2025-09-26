@@ -29,7 +29,8 @@ export const products = defineTable({
   updatedTime: v.optional(v.string()),
 })
   .index("by_category", ["category"])
-  .index("by_productCategory", ["productCategoryId"]);
+  .index("by_productCategory", ["productCategoryId"])
+  .index("by_mondayItemId", ["mondayItemId"]);
 
 export const productCategories = defineTable({
   name: v.string(),

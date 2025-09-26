@@ -1,6 +1,7 @@
+import "monday-ui-style/dist/index.min.css";
 import "~/styles/globals.css";
 
-import { Geist, Geist_Mono, Inter } from "next/font/google";
+import { Inter } from "next/font/google";
 
 import { cn } from "~/lib/utils";
 import { AppSidebar } from "./_components/app-sidebar";
@@ -20,14 +21,14 @@ export const metadata = {
   icons: [{ rel: "icon", url: "/favicon.jpeg" }],
 };
 
-const geistSans = Geist({
-  subsets: ["latin"],
-  variable: "--font-geist-sans",
-});
-const geistMono = Geist_Mono({
-  subsets: ["latin"],
-  variable: "--font-geist-mono",
-});
+// const geistSans = Geist({
+//   subsets: ["latin"],
+//   variable: "--font-geist-sans",
+// });
+// const geistMono = Geist_Mono({
+//   subsets: ["latin"],
+//   variable: "--font-geist-mono",
+// });
 
 export default async function RootLayout({
   children,
@@ -35,13 +36,9 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable}`} suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <body
-        className={cn(
-          "overscroll-none bg-background font-sans text-foreground antialiased",
-          geistSans.variable,
-          geistMono.variable,
-        )}
+        className={`font-sans ${inter.variable} flex min-h-screen flex-1 flex-col bg-slate-50`}
       >
         <Providers>
           <AppSidebar variant="inset" />

@@ -10,6 +10,8 @@ export const orders = defineTable({
   eventId: v.optional(v.id("events")),
   // Monday.com main item id if applicable
   mondayItemId: v.optional(v.string()),
+  // Human-friendly incremental order number
+  orderNumber: v.optional(v.number()),
   // Aggregated totals (denormalized for convenience)
   totalQuantity: v.optional(v.number()),
   totalPrice: v.optional(v.number()),
@@ -20,13 +22,17 @@ export const orders = defineTable({
   // Featured image for order summary/printouts
   featuredImageId: v.optional(v.id("_storage")),
   featuredImageUrl: v.optional(v.string()),
+  // New: pickup/dropoff location
+  pickupDropoffLocation: v.optional(v.string()),
   // Timestamps
   createdAt: v.number(),
   updatedAt: v.optional(v.number()),
 })
   .index("by_creator", ["createdById"]) // query orders by creator
   .index("by_status", ["status"]) // filter by status
-  .index("by_event", ["eventId"]); // list orders for an event
+  .index("by_event", ["eventId"]) // list orders for an event
+  .index("by_mondayItemId", ["mondayItemId"]) // map to monday item
+  .index("by_orderNumber", ["orderNumber"]);
 
 export const orderLineItems = defineTable({
   orderId: v.id("orders"),
@@ -44,3 +50,9 @@ export const orderLineItems = defineTable({
 })
   .index("by_order", ["orderId"]) // list items for an order
   .index("by_product", ["productId"]); // find orders involving a product
+
+// Simple counter table for generating incremental numbers
+export const counters = defineTable({
+  key: v.string(),
+  value: v.number(),
+}).index("by_key", ["key"]);

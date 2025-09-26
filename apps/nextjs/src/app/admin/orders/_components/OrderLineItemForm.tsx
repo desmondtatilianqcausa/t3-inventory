@@ -1,16 +1,22 @@
 "use client";
 
-import * as React from "react";
-
-import { useMemo, useState } from "react";
-
-import { Button } from "../../../_components/ui/button";
-import type { ColumnDef } from "@tanstack/react-table";
-import { DataTable } from "../../../_components/Table";
 import type { Id } from "@/convex/_generated/dataModel";
-import { Input } from "../../../_components/ui/input";
+import type { ColumnDef } from "@tanstack/react-table";
+import * as React from "react";
+import { useMemo, useState } from "react";
 import { api } from "@/convex/_generated/api";
 import { useQuery } from "convex/react";
+
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "~/app/_components/ui/card";
+import { Separator } from "~/app/_components/ui/separator";
+import { DataTable } from "../../../_components/Table";
+import { Button } from "../../../_components/ui/button";
+import { Input } from "../../../_components/ui/input";
 
 export type SelectableProduct = {
   _id: string;
@@ -93,7 +99,7 @@ export default function OrderLineItemForm({
         header: "Price",
         cell: ({ row }) => <>${row.original.price}</>,
       },
-      { accessorKey: "quantity", header: "In Stock" },
+      { accessorKey: "stock", header: "Stock" },
     ],
     [selected],
   );
@@ -110,35 +116,48 @@ export default function OrderLineItemForm({
   };
 
   return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-3 gap-2">
-        <select
-          className="rounded border p-2"
-          value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value)}
-        >
-          <option value="">All Categories</option>
-          {categories?.map((c) => (
-            <option
-              key={c._id as unknown as string}
-              value={c._id as unknown as string}
-            >
-              {c.name}
-            </option>
-          ))}
-        </select>
-        <Input
-          placeholder="Search products..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <div className="text-right">
-          <Button type="button" onClick={handleAdd}>
-            Add Selected
-          </Button>
+    <Card className="space-y-3 border-none shadow-none">
+      <CardHeader className="sticky top-0 z-10 gap-2 bg-white">
+        <CardTitle className="text-xl font-bold">Add Products</CardTitle>
+        <div className="grid grid-cols-3 gap-2">
+          <select
+            className="rounded border p-2"
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+          >
+            <option value="">All Categories</option>
+            {categories?.map((c) => (
+              <option
+                key={c._id as unknown as string}
+                value={c._id as unknown as string}
+              >
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <Input
+            placeholder="Search products..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <div className="text-right">
+            <Button type="button" onClick={handleAdd}>
+              Add Selected
+            </Button>
+          </div>
         </div>
-      </div>
-      <DataTable data={filtered} columns={columns} postType="Product" />
-    </div>
+        <Separator />
+      </CardHeader>
+
+      <CardContent>
+        <DataTable
+          data={filtered}
+          columns={columns}
+          postType="Product"
+          showAddButton={false}
+          showCustomizeColumns={false}
+        />
+      </CardContent>
+    </Card>
   );
 }

@@ -12,6 +12,17 @@ import { useFieldArray, useForm } from "react-hook-form";
 import { cn } from "src/lib/utils";
 
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "~/app/_components/ui/alert-dialog";
+import {
   Command,
   CommandEmpty,
   CommandGroup,
@@ -106,6 +117,7 @@ type OrderStatus =
 type OrderFormValues = {
   status?: OrderStatus;
   eventId?: string;
+  pickupDropoffLocation?: string;
   createdById?: string;
   items: Array<{
     productId?: Id<"products">;
@@ -148,6 +160,7 @@ export default function OrderForm({ orderId }: { orderId?: string }) {
     defaultValues: {
       status: "Draft",
       eventId: undefined,
+      pickupDropoffLocation: undefined,
       createdById: "seed-user",
       mondayItemId: "",
     },
@@ -222,6 +235,7 @@ export default function OrderForm({ orderId }: { orderId?: string }) {
       eventId: vals.eventId
         ? (vals.eventId as unknown as Id<"events">)
         : undefined,
+      pickupDropoffLocation: vals.pickupDropoffLocation ?? undefined,
     });
     setCreatedOrderId(newId);
     return newId;
@@ -269,11 +283,69 @@ export default function OrderForm({ orderId }: { orderId?: string }) {
   const isEditable =
     currentStatus === "Draft" || currentStatus === "Awaiting Payment";
 
+  // Expose minimal interop for header actions
+  useEffect(() => {
+    (window as any).__orderFormActions = {
+      setStatusAndSave: (nextStatus: OrderStatus) => {
+        // If checking out and we have Monday user email, set it as the order user
+        if (nextStatus === "Check-Out" && (window as any).__mondayUserEmail) {
+          form.setValue(
+            "createdById",
+            String((window as any).__mondayUserEmail as string),
+          );
+        }
+        form.setValue("status", nextStatus);
+        const formEl = document.querySelector("form") as HTMLFormElement | null;
+        formEl?.requestSubmit();
+      },
+    };
+    return () => {
+      delete (window as any).__orderFormActions;
+    };
+  }, [form]);
+
+  // Fetch Monday current user email if embedded
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const inIframe =
+          typeof window !== "undefined" && window.self !== window.top;
+        if (!inIframe) return;
+        const mondaySDK = (await import("monday-sdk-js")).default;
+        const monday = mondaySDK();
+        const res = await monday.api(`query { me { email } }`);
+        const email = (res as any)?.data?.me?.email;
+        if (mounted && typeof email === "string") {
+          (window as any).__mondayUserEmail = email;
+          const current = form.getValues("createdById") as string | undefined;
+          if (!current || current === "seed-user") {
+            form.setValue("createdById", email);
+          }
+        }
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    (window as any).__orderFormState = { status: currentStatus };
+    window.dispatchEvent(
+      new CustomEvent("app:orderStatusChanged", { detail: currentStatus }),
+    );
+  }, [currentStatus]);
+
   useEffect(() => {
     if (order) {
       form.reset({
         status: (order.status as OrderStatus | undefined) ?? "Draft",
         eventId: (order.eventId as unknown as string | undefined) ?? undefined,
+        pickupDropoffLocation: (order as { pickupDropoffLocation?: unknown })
+          .pickupDropoffLocation as string | undefined,
         createdById: order.createdById ?? "seed-user",
         items: [], // load existing items separately if needed
         mondayItemId: (order.mondayItemId as string | undefined) ?? "",
@@ -492,14 +564,28 @@ export default function OrderForm({ orderId }: { orderId?: string }) {
       id: "actions",
       header: "Actions",
       cell: ({ row }) => (
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => remove(row.original.idx)}
-          disabled={!isEditable}
-        >
-          Remove
-        </Button>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button type="button" variant="outline" disabled={!isEditable}>
+              Remove
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Remove this line item?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. The item will be removed from this
+                order.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={() => remove(row.original.idx)}>
+                Remove
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       ),
       meta: {
         headerClassName: "min-w-32",
@@ -523,6 +609,7 @@ export default function OrderForm({ orderId }: { orderId?: string }) {
         id: existingId,
         status: values.status ?? undefined,
         eventId: eventIdConvex,
+        pickupDropoffLocation: values.pickupDropoffLocation ?? undefined,
         createdById: values.createdById ?? undefined,
         totalQuantity: totals.totalQty,
         totalPrice: totals.totalPrice,
@@ -533,10 +620,18 @@ export default function OrderForm({ orderId }: { orderId?: string }) {
         description: "Order updated successfully",
       });
     } else {
+      const mondayEmail =
+        typeof window !== "undefined"
+          ? (window as any).__mondayUserEmail
+          : undefined;
       const newId = await createOrder({
-        createdById: values.createdById ?? "seed-user",
+        createdById:
+          typeof mondayEmail === "string"
+            ? mondayEmail
+            : (values.createdById ?? "seed-user"),
         status: values.status ?? undefined,
         eventId: eventIdConvex,
+        pickupDropoffLocation: values.pickupDropoffLocation ?? undefined,
         totalQuantity: totals.totalQty,
         totalPrice: totals.totalPrice,
       });
@@ -593,21 +688,276 @@ export default function OrderForm({ orderId }: { orderId?: string }) {
   return (
     <Form {...form}>
       <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
-        <Card>
-          <div className="sticky top-0 z-10 bg-white shadow-md">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>
-                Order # <span className="text-lg">{order?._id}</span>
-              </CardTitle>
-              <div className="flex flex-row items-center gap-2">
+        <div className="grid grid-cols-12 gap-6">
+          <div className="col-span-12 lg:col-span-9">
+            <Card>
+              <div className="sticky top-0 z-10 bg-white">
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle>
+                    Order # <span className="text-lg">{order?._id}</span>
+                  </CardTitle>
+                </CardHeader>
+                <Separator />
+              </div>
+              <CardContent className="space-y-10 p-6">
+                <div className="grid grid-cols-1 gap-4">
+                  <FormField<OrderFormValues>
+                    control={form.control}
+                    name="eventId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xl font-bold">
+                          Event (required)
+                        </FormLabel>
+                        <Popover
+                          open={eventOpen}
+                          onOpenChange={(open) => {
+                            setEventOpen(open);
+                            if (open && eventTriggerRef.current) {
+                              setEventPopoverWidth(
+                                eventTriggerRef.current.offsetWidth,
+                              );
+                            }
+                          }}
+                        >
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              aria-expanded={eventOpen}
+                              className="w-full justify-between"
+                              ref={eventTriggerRef}
+                            >
+                              {field.value
+                                ? (() => {
+                                    const all = eventsGrouped.flatMap(
+                                      (g) => g.items,
+                                    );
+                                    const found = all.find(
+                                      (p) =>
+                                        String(p.raw._id) ===
+                                        String(field.value),
+                                    );
+                                    return found
+                                      ? `${dayLabelOf(found.date!)} - ${found.raw.title}`
+                                      : "Select event";
+                                  })()
+                                : "Select event"}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent
+                            align="start"
+                            className="p-0"
+                            style={{ width: eventPopoverWidth ?? undefined }}
+                          >
+                            <Command>
+                              <CommandInput placeholder="Search events..." />
+                              <CommandEmpty>No events found.</CommandEmpty>
+                              <CommandList className="w-full">
+                                {eventsGrouped.map((group) => (
+                                  <CommandGroup
+                                    key={monthKeyOf(group.month)}
+                                    heading={monthLabelOf(group.month)}
+                                  >
+                                    {group.items.map((p) => {
+                                      const value = String(p.raw._id);
+                                      const label = `${dayLabelOf(p.date!)} - ${p.raw.title}`;
+                                      return (
+                                        <CommandItem
+                                          key={value}
+                                          value={label}
+                                          onSelect={() => {
+                                            field.onChange(value);
+                                            setEventOpen(false);
+                                          }}
+                                        >
+                                          <Check
+                                            className={cn(
+                                              "mr-2 h-4 w-4",
+                                              String(field.value ?? "") ===
+                                                value
+                                                ? "opacity-100"
+                                                : "opacity-0",
+                                            )}
+                                          />
+                                          {label}
+                                        </CommandItem>
+                                      );
+                                    })}
+                                  </CommandGroup>
+                                ))}
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Pickup/Dropoff Location */}
+                  <FormField<OrderFormValues>
+                    control={form.control}
+                    name="pickupDropoffLocation"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xl font-bold">
+                          Pickup/Dropoff Location
+                        </FormLabel>
+                        <Select
+                          value={String(field.value ?? "")}
+                          onValueChange={(v) => field.onChange(v)}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select location" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="Deland Office">
+                              Deland Office
+                            </SelectItem>
+                            <SelectItem value="Kepler Office">
+                              Kepler Office
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <DataTable
+                    title="Line Items"
+                    titleSize="xl"
+                    data={tableRows}
+                    columns={columns}
+                    postType="Item"
+                    onAddNew={isEditable ? () => setOpen(true) : undefined}
+                    showAddButton={isEditable}
+                    showTextFilter={false}
+                    showCustomizeColumns={false}
+                    showTableFooter={false}
+                  />
+                </div>
+                <Dialog open={open} onOpenChange={setOpen}>
+                  <DialogContent className="max-h-[90%] max-w-4xl overflow-y-auto">
+                    <DialogHeader className="hidden">
+                      <DialogTitle>Select Products</DialogTitle>
+                    </DialogHeader>
+                    <OrderLineItemForm onAdd={handleAddFromDialog} />
+                  </DialogContent>
+                </Dialog>
+
+                <Dialog open={imageOpen} onOpenChange={setImageOpen}>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Featured Image</DialogTitle>
+                    </DialogHeader>
+                    <div className="flex items-center gap-2">
+                      <input
+                        id="order-image-input"
+                        type="file"
+                        accept="image/*"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={async () => {
+                          const input = document.getElementById(
+                            "order-image-input",
+                          ) as HTMLInputElement | null;
+                          const file = input?.files?.[0] ?? null;
+                          if (!file || !order?._id) return;
+                          const postUrl = await generateOrderUploadUrl({});
+                          const res = await fetch(postUrl, {
+                            method: "POST",
+                            headers: { "Content-Type": file.type },
+                            body: file,
+                          });
+                          const { storageId } = (await res.json()) as {
+                            storageId: Id<"_storage">;
+                          };
+                          await setOrderFeaturedImage({
+                            orderId: order._id as Id<"orders">,
+                            storageId,
+                          });
+                        }}
+                        disabled={!order?._id}
+                      >
+                        Upload Featured
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </CardContent>
+            </Card>
+          </div>
+          <div className="col-span-12 lg:col-span-3">
+            {/* Actions Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Actions</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-3">
+                <FormField<OrderFormValues>
+                  control={form.control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Status</FormLabel>
+                      <Select
+                        value={String(field.value ?? "")}
+                        onValueChange={(v) => field.onChange(v as OrderStatus)}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Draft">Draft</SelectItem>
+                          <SelectItem value="Awaiting Payment">
+                            Awaiting Payment
+                          </SelectItem>
+                          <SelectItem value="Check-Out">Check-Out</SelectItem>
+                          <SelectItem value="Check-In">Check-In</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 <Button
                   type="submit"
-                  className="bg-green-700 text-xl hover:bg-green-600"
+                  className="bg-green-700 hover:bg-green-600"
                 >
                   Save
                 </Button>
                 <Button
                   type="button"
+                  className="bg-blue-700 hover:bg-blue-600"
+                  onClick={() => {
+                    const next =
+                      currentStatus === "Check-Out"
+                        ? ("Check-In" as OrderStatus)
+                        : ("Check-Out" as OrderStatus);
+                    form.setValue("status", next);
+                    const formEl = document.querySelector(
+                      "form",
+                    ) as HTMLFormElement | null;
+                    formEl?.requestSubmit();
+                  }}
+                >
+                  {currentStatus === "Check-Out" ? "Check-In" : "Check-Out"}
+                </Button>
+                {/* <Button
+                  type="button"
+                  className="bg-purple-700 hover:bg-purple-600"
+                  disabled={!order?._id}
                   onClick={async () => {
                     try {
                       if (!order?._id) return;
@@ -630,299 +980,85 @@ export default function OrderForm({ orderId }: { orderId?: string }) {
                       });
                     }
                   }}
-                  disabled={!order?._id}
-                  className="bg-purple-700 text-xl hover:bg-purple-600"
                 >
                   Run Workflow
-                </Button>
-                <Button
-                  onClick={() => {
-                    console.log("check-out");
-                  }}
-                  className="bg-blue-700 text-xl hover:bg-blue-600"
-                >
-                  Check-Out
-                </Button>
-              </div>
-            </CardHeader>
-            <Separator />
-          </div>
-          <CardContent className="space-y-10 p-6">
-            <div className="grid grid-cols-2 gap-4">
-              <FormField<OrderFormValues>
-                control={form.control}
-                name="status"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Status</FormLabel>
-                    <Select
-                      value={String(field.value ?? "")}
-                      onValueChange={(v) => field.onChange(v as OrderStatus)}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Draft">Draft</SelectItem>
-                        <SelectItem value="Awaiting Payment">
-                          Awaiting Payment
-                        </SelectItem>
-                        <SelectItem value="Check-Out">Check-Out</SelectItem>
-                        <SelectItem value="Check-In">Check-In</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField<OrderFormValues>
-                control={form.control}
-                name="createdById"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Linked User (createdById)</FormLabel>
-                    <FormControl>
-                      <Input
-                        value={String(field.value ?? "")}
-                        onChange={(e) => field.onChange(e.target.value)}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              {/* Monday Item Id */}
-              <FormField
-                control={form.control}
-                name="mondayItemId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Monday Item ID</FormLabel>
-                    <div className="flex items-center gap-2">
-                      <FormControl>
-                        <Input {...field} placeholder="e.g. 1234567890" />
-                      </FormControl>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        disabled={!order?._id || !field.value}
-                        onClick={async () => {
-                          try {
-                            await setOrderMondayItemId({
-                              id: order?._id as Id<"orders">,
-                              mondayItemId: String(field.value),
-                            });
-                            toast({ title: "Saved Monday Item ID" });
-                          } catch (e) {
-                            toast({
-                              title: "Failed to save Monday Item ID",
-                              description:
-                                e instanceof Error ? e.message : String(e),
-                              variant: "destructive",
-                            });
-                          }
-                        }}
-                      >
-                        Set
-                      </Button>
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField<OrderFormValues>
-                control={form.control}
-                name="eventId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Event (required)</FormLabel>
-                    <Popover
-                      open={eventOpen}
-                      onOpenChange={(open) => {
-                        setEventOpen(open);
-                        if (open && eventTriggerRef.current) {
-                          setEventPopoverWidth(
-                            eventTriggerRef.current.offsetWidth,
-                          );
-                        }
-                      }}
-                    >
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          role="combobox"
-                          aria-expanded={eventOpen}
-                          className="w-full justify-between"
-                          ref={eventTriggerRef}
-                        >
-                          {field.value
-                            ? (() => {
-                                const all = eventsGrouped.flatMap(
-                                  (g) => g.items,
-                                );
-                                const found = all.find(
-                                  (p) =>
-                                    String(p.raw._id) === String(field.value),
-                                );
-                                return found
-                                  ? `${dayLabelOf(found.date!)} - ${found.raw.title}`
-                                  : "Select event";
-                              })()
-                            : "Select event"}
-                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent
-                        align="start"
-                        className="p-0"
-                        style={{ width: eventPopoverWidth ?? undefined }}
-                      >
-                        <Command>
-                          <CommandInput placeholder="Search events..." />
-                          <CommandEmpty>No events found.</CommandEmpty>
-                          <CommandList className="w-full">
-                            {eventsGrouped.map((group) => (
-                              <CommandGroup
-                                key={monthKeyOf(group.month)}
-                                heading={monthLabelOf(group.month)}
-                              >
-                                {group.items.map((p) => {
-                                  const value = String(p.raw._id);
-                                  const label = `${dayLabelOf(p.date!)} - ${p.raw.title}`;
-                                  return (
-                                    <CommandItem
-                                      key={value}
-                                      value={label}
-                                      onSelect={() => {
-                                        field.onChange(value);
-                                        setEventOpen(false);
-                                      }}
-                                    >
-                                      <Check
-                                        className={cn(
-                                          "mr-2 h-4 w-4",
-                                          String(field.value ?? "") === value
-                                            ? "opacity-100"
-                                            : "opacity-0",
-                                        )}
-                                      />
-                                      {label}
-                                    </CommandItem>
-                                  );
-                                })}
-                              </CommandGroup>
-                            ))}
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+                </Button> */}
+              </CardContent>
+            </Card>
 
-            {/* <div className="space-y-2">
-              <FormLabel>Order Featured Image</FormLabel>
-              {typeof (order as { featuredImageUrl?: unknown } | null)
-                ?.featuredImageUrl === "string" ? (
-                <Image
-                  src={
-                    (order as { featuredImageUrl?: unknown })
-                      .featuredImageUrl as string
-                  }
-                  alt="Featured"
-                  className="h-32 w-32 rounded border object-cover"
-                  width={128}
-                  height={128}
+            {/* Users Card */}
+            <Card className="mt-6">
+              <CardHeader>
+                <CardTitle>Users</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-3">
+                <FormField<OrderFormValues>
+                  control={form.control}
+                  name="createdById"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Linked User (createdById)</FormLabel>
+                      <FormControl>
+                        <Input
+                          value={String(field.value ?? "")}
+                          onChange={(e) => field.onChange(e.target.value)}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              ) : (
-                <div className="h-32 w-32 rounded border bg-muted" />
-              )}
-              <div className="flex items-center gap-2">
-                <input id="order-image-input" type="file" accept="image/*" />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={async () => {
-                    const input = document.getElementById(
-                      "order-image-input",
-                    ) as HTMLInputElement | null;
-                    const file = input?.files?.[0] ?? null;
-                    if (!file || !order?._id) return;
-                    const postUrl = await generateOrderUploadUrl({});
-                    const res = await fetch(postUrl, {
-                      method: "POST",
-                      headers: { "Content-Type": file.type },
-                      body: file,
-                    });
-                    const { storageId } = (await res.json()) as {
-                      storageId: Id<"_storage">;
-                    };
-                    await setOrderFeaturedImage({
-                      orderId: order._id as Id<"orders">,
-                      storageId,
-                    });
-                  }}
-                  disabled={!order?._id}
-                >
-                  Upload Featured
-                </Button>
-              </div>
-            </div> */}
+              </CardContent>
+            </Card>
 
-            <div className="space-y-2">
-              <DataTable
-                title="Line Items"
-                titleSize="xl"
-                data={tableRows}
-                columns={columns}
-                postType="Item"
-                onAddNew={isEditable ? () => setOpen(true) : undefined}
-                showAddButton={isEditable}
-                showTextFilter={false}
-                showCustomizeColumns={false}
-                showTableFooter={false}
-              />
-            </div>
-            <Dialog open={open} onOpenChange={setOpen}>
-              <DialogContent className="max-w-4xl">
-                <DialogHeader>
-                  <DialogTitle>Select Products</DialogTitle>
-                </DialogHeader>
-                <OrderLineItemForm onAdd={handleAddFromDialog} />
-              </DialogContent>
-            </Dialog>
-
-            <Dialog open={imageOpen} onOpenChange={setImageOpen}>
-              <DialogContent className="max-w-3xl">
-                {imageUrl ? (
-                  <Image
-                    src={imageUrl}
-                    alt=""
-                    className="h-auto w-full rounded"
-                    width={128}
-                    height={128}
-                  />
-                ) : null}
-              </DialogContent>
-            </Dialog>
-
-            {/* <div className="flex items-center justify-between rounded border p-3 text-sm">
-              <div>Items: {totals.totalQty}</div>
-              <div>Total: ${totals.totalPrice.toFixed(2)}</div>
-            </div> */}
-
-            <Button
-              type="submit"
-              className="bg-green-700 text-xl hover:bg-green-600"
-            >
-              Save
-            </Button>
-          </CardContent>
-        </Card>
+            {/* Extra Fields Card */}
+            <Card className="mt-6">
+              <CardHeader>
+                <CardTitle>Extra Fields</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-3">
+                <FormField
+                  control={form.control}
+                  name="mondayItemId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Monday Item ID</FormLabel>
+                      <div className="flex items-center gap-2">
+                        <FormControl>
+                          <Input {...field} placeholder="e.g. 1234567890" />
+                        </FormControl>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={!order?._id || !field.value}
+                          onClick={async () => {
+                            try {
+                              await setOrderMondayItemId({
+                                id: order?._id as Id<"orders">,
+                                mondayItemId: String(field.value),
+                              });
+                              toast({ title: "Saved Monday Item ID" });
+                            } catch (e) {
+                              toast({
+                                title: "Failed to save Monday Item ID",
+                                description:
+                                  e instanceof Error ? e.message : String(e),
+                                variant: "destructive",
+                              });
+                            }
+                          }}
+                        >
+                          Set
+                        </Button>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </form>
     </Form>
   );

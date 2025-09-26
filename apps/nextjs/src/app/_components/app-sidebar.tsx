@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-
 import {
   BookOpen,
   Bot,
@@ -17,6 +16,11 @@ import {
   Square,
   Workflow,
 } from "lucide-react";
+import { TbCloudDataConnection } from "react-icons/tb";
+import { NavMain } from "src/app/_components/nav-main";
+import { NavProjects } from "src/app/_components/nav-projects";
+import { NavSecondary } from "src/app/_components/nav-secondary";
+import { NavUser } from "src/app/_components/nav-user";
 import {
   Sidebar,
   SidebarContent,
@@ -26,12 +30,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "src/app/_components/ui/sidebar";
-
-import { NavMain } from "src/app/_components/nav-main";
-import { NavProjects } from "src/app/_components/nav-projects";
-import { NavSecondary } from "src/app/_components/nav-secondary";
-import { NavUser } from "src/app/_components/nav-user";
-import { TbCloudDataConnection } from "react-icons/tb";
+import { useMonday } from "src/app/providers";
 
 export const navData = {
   user: {
@@ -174,6 +173,9 @@ export const navData = {
 };
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { isInMonday } = useMonday();
+  console.log("isInMonday", isInMonday);
+  if (isInMonday) return null;
   return (
     <Sidebar variant="inset" {...props}>
       <SidebarHeader>
@@ -181,7 +183,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <a href="#">
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+                <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
                   <Command className="size-4" />
                 </div>
                 <div className="grid flex-1 text-left text-sm leading-tight">

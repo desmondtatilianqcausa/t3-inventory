@@ -59,15 +59,53 @@ export const syncOrderToMonday = action({
     console.log("status", status);
     if (status !== "Check-Out" && status !== "Check-In") return null;
 
-    // Compose column values for Monday (status only unless mapped extras are added later)
+    // Fetch board columns to know types for shaping values safely
+    const cols = await ctx.runAction(api.monday.actions.listBoardColumns, {
+      apiToken: cfg.apiToken,
+      boardId: cfg.ordersBoardId,
+    });
+    const typeById = new Map<string, string>();
+    for (const c of cols ?? []) {
+      if (c?.id) typeById.set(String(c.id), String(c.type ?? ""));
+    }
+
+    // Compose column values for Monday using correct shapes
     const statusCol = String(
       (cfg.columnMap?.ordersStatusColumnId as string | undefined) ?? "",
     );
     const eventCol = String(
       (cfg.columnMap?.ordersEventColumnId as string | undefined) ?? "",
     );
+    const createdByCol = String(
+      (cfg.columnMap?.ordersCreatedByColumnId as string | undefined) ?? "",
+    );
+
     const orderColumns: Record<string, unknown> = {};
-    if (statusCol) orderColumns[statusCol] = { label: status };
+
+    // Helper to set column by respecting column type
+    const setCol = (colId: string, value: unknown) => {
+      if (!colId) return;
+      const t = typeById.get(colId);
+      if (!t) return; // unknown type; skip to avoid invalid payload
+      if (t === "status") {
+        if (typeof value === "string" && value) {
+          orderColumns[colId] = { label: value };
+        }
+      } else if (t === "email") {
+        if (typeof value === "string" && value) {
+          orderColumns[colId] = { email: value, text: value };
+        }
+      } else if (t === "text" || t === "long_text") {
+        if (typeof value === "string" && value) {
+          orderColumns[colId] = value;
+        }
+      } else {
+        // Unsupported types for now; avoid sending invalid shapes
+      }
+    };
+
+    setCol(statusCol, status);
+
     if (eventCol && order.eventId) {
       try {
         const ev = await ctx.runQuery(api.events.queries.getById, {
@@ -75,21 +113,29 @@ export const syncOrderToMonday = action({
         });
         const eventTitle = (ev as { title?: unknown } | null)?.title;
         if (typeof eventTitle === "string" && eventTitle.trim()) {
-          orderColumns[eventCol] = eventTitle;
+          setCol(eventCol, eventTitle);
         }
       } catch {}
+    }
+
+    if (createdByCol && typeof order.createdById === "string") {
+      setCol(createdByCol, order.createdById);
     }
 
     // Ensure a top-level Monday item exists or update it
     let mondayItemId: string | undefined = order.mondayItemId ?? undefined;
     if (!mondayItemId) {
+      const displayName =
+        typeof (order as any).orderNumber === "number"
+          ? `Order #${(order as any).orderNumber}`
+          : `Order ${String(orderId)}`;
       mondayItemId = await ctx.runAction(api.monday.actions.createItem, {
         config: {
           apiToken: cfg.apiToken,
           boardId: cfg.ordersBoardId,
           groupId: cfg.groupId,
         },
-        name: `Order ${String(orderId)}`,
+        name: displayName,
         columnValues: orderColumns,
       });
       await ctx.runMutation(api.orders.mutations.setMondayItemId, {

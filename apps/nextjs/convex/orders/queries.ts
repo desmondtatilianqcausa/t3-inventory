@@ -16,6 +16,8 @@ const orderDoc = v.object({
   processingMeta: v.optional(v.any()),
   createdAt: v.number(),
   updatedAt: v.optional(v.number()),
+  orderNumber: v.optional(v.number()),
+  pickupDropoffLocation: v.optional(v.string()),
 });
 
 const lineItemDoc = v.object({

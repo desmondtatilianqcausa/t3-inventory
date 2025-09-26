@@ -1,6 +1,7 @@
+import { v } from "convex/values";
+
 import { mutation } from "../_generated/server";
 import { slugify } from "./helpers";
-import { v } from "convex/values";
 
 const baseEventArgs = {
   title: v.string(),
@@ -21,9 +22,11 @@ const baseEventArgs = {
   isFree: v.optional(v.boolean()),
   price: v.optional(v.number()),
   images: v.optional(v.array(v.string())),
-  startAt: v.optional(v.number()),
-  endAt: v.optional(v.number()),
+  startAt: v.optional(v.string()),
+  endAt: v.optional(v.string()),
   isRecurring: v.optional(v.boolean()),
+  // Link back to Monday parent item
+  mondayItemId: v.optional(v.string()),
 };
 
 export const create = mutation({
@@ -40,9 +43,18 @@ export const create = mutation({
     const finalSlug = existing ? `${slug}-${now}` : slug;
 
     return await ctx.db.insert("events", {
-      ...args,
+      title: args.title,
+      description: args.description,
       slug: finalSlug,
-      createdAt: now,
+      createdById: args.createdById,
+      location: args.location ?? null,
+      isFree: args.isFree,
+      price: args.price,
+      images: args.images,
+      startAt: args.startAt,
+      endAt: args.endAt,
+      isRecurring: args.isRecurring,
+      mondayItemId: args.mondayItemId,
       updatedAt: now,
     });
   },
@@ -71,9 +83,26 @@ export const update = mutation({
     }
 
     await ctx.db.patch(id, {
-      ...rest,
       ...(title !== undefined ? { title } : {}),
+      ...(rest.description !== undefined
+        ? { description: rest.description }
+        : {}),
       ...(newSlug !== undefined ? { slug: newSlug } : {}),
+      ...(rest.createdById !== undefined
+        ? { createdById: rest.createdById }
+        : {}),
+      ...(rest.location !== undefined ? { location: rest.location } : {}),
+      ...(rest.isFree !== undefined ? { isFree: rest.isFree } : {}),
+      ...(rest.price !== undefined ? { price: rest.price } : {}),
+      ...(rest.images !== undefined ? { images: rest.images } : {}),
+      ...(rest.startAt !== undefined ? { startAt: rest.startAt } : {}),
+      ...(rest.endAt !== undefined ? { endAt: rest.endAt } : {}),
+      ...(rest.isRecurring !== undefined
+        ? { isRecurring: rest.isRecurring }
+        : {}),
+      ...(rest.mondayItemId !== undefined
+        ? { mondayItemId: rest.mondayItemId }
+        : {}),
       updatedAt: now,
     });
     return null;
@@ -85,6 +114,21 @@ export const remove = mutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     await ctx.db.delete(args.id);
+    return null;
+  },
+});
+
+export const removeByMondayItemId = mutation({
+  args: { mondayItemId: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { mondayItemId }) => {
+    const ev = await ctx.db
+      .query("events")
+      .withIndex("by_mondayItemId", (q) => q.eq("mondayItemId", mondayItemId))
+      .first();
+    if (ev) {
+      await ctx.db.delete(ev._id);
+    }
     return null;
   },
 });

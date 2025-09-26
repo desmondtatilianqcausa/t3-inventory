@@ -14,6 +14,7 @@ export const create = mutation({
     category: v.optional(v.string()),
     productCategoryId: v.optional(v.id("productCategories")),
     status: v.optional(v.string()), // Draft | Published | Removed
+    mondayItemId: v.optional(v.number()),
   },
   returns: v.id("products"),
   handler: async (ctx, args) => {
@@ -28,6 +29,7 @@ export const create = mutation({
       // Use null when productCategoryId is not provided
       productCategoryId: args.productCategoryId ?? null,
       status: args.status ?? "Draft",
+      mondayItemId: args.mondayItemId,
     });
 
     // Do not sync to Monday here; products start as Draft and only sync when Published
@@ -221,6 +223,19 @@ export const setMondayItemId = mutation({
   returns: v.null(),
   handler: async (ctx, { id, mondayItemId }) => {
     await ctx.db.patch(id, { mondayItemId });
+    return null;
+  },
+});
+
+export const removeByMondayItemId = mutation({
+  args: { mondayItemId: v.number() },
+  returns: v.null(),
+  handler: async (ctx, { mondayItemId }) => {
+    const found = await ctx.db
+      .query("products")
+      .withIndex("by_mondayItemId", (q) => q.eq("mondayItemId", mondayItemId))
+      .first();
+    if (found) await ctx.db.delete(found._id);
     return null;
   },
 });

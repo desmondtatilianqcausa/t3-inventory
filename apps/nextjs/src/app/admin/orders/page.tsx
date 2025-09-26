@@ -1,15 +1,19 @@
 "use client";
 
-import { deleteOrder, duplicateOrder } from "./actions";
-import { useMutation, useQuery } from "convex/react";
-
-import { DataTable } from "../../_components/Table";
-import React from "react";
-import { Spinner } from "~/app/_components/ui/loading-spinner";
-import { api } from "@/convex/_generated/api";
-import { createColumns } from "./columns";
-import { toast } from "../../_components/ui/use-toast";
+import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { api, api as convexApi } from "@/convex/_generated/api";
+import { useMutation, useQuery } from "convex/react";
+import mondaySdk from "monday-sdk-js";
+import { Button } from "src/app/_components/ui/button";
+
+import { Spinner } from "~/app/_components/ui/loading-spinner";
+import { DataTable } from "../../_components/Table";
+import { toast } from "../../_components/ui/use-toast";
+import { deleteOrder, duplicateOrder } from "./actions";
+import { createColumns } from "./columns";
+
+const monday = mondaySdk();
 
 // eslint-disable-next-line @typescript-eslint/ban-types
 type Props = {};
@@ -27,8 +31,66 @@ export default function OrderPage({}: Props) {
 
   const router = useRouter();
   const createOrder = useMutation(api.orders.mutations.create);
+  const bulkDelete = useMutation(api.orders.mutations.bulkDelete);
   console.log("orders", orders);
 
+  useEffect(() => {
+    // Fetch current user info
+    monday
+      .api(`query { me { id name email } }`)
+      .then((res) => {
+        console.log("User Info", res);
+      })
+      .catch((err) => {
+        console.error("Error fetching user email:", err);
+      });
+  }, []);
+
+  // Status filters
+  const [statusFilter, setStatusFilter] = useState<Set<string>>(
+    () => new Set(["Draft", "Check-Out"]),
+  );
+  const toggleStatus = (s: string) => {
+    setStatusFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(s)) next.delete(s);
+      else next.add(s);
+      return next;
+    });
+  };
+  const filteredOrders = useMemo(() => {
+    if (!orders) return orders;
+    if (statusFilter.size === 0) return orders;
+    return orders.filter((o) => statusFilter.has(String(o.status ?? "")));
+  }, [orders, statusFilter]);
+
+  const statusFilterControls = (
+    <>
+      <Button
+        type="button"
+        variant={statusFilter.has("Draft") ? "secondary" : "outline"}
+        onClick={() => toggleStatus("Draft")}
+      >
+        Draft
+      </Button>
+      <Button
+        type="button"
+        variant={statusFilter.has("Check-Out") ? "secondary" : "outline"}
+        onClick={() => toggleStatus("Check-Out")}
+      >
+        Check-Out
+      </Button>
+      <Button
+        type="button"
+        variant={statusFilter.has("Check-In") ? "secondary" : "outline"}
+        onClick={() => toggleStatus("Check-In")}
+      >
+        Check-In
+      </Button>
+    </>
+  );
+
+  // Removed header Save action from list page; it now appears on order detail page.
   // const [data, setData] = useState<orderType>([]);
   // const [loading, setLoading] = useState(true);
 
@@ -102,10 +164,14 @@ export default function OrderPage({}: Props) {
     <div className="flex flex-1 flex-col">
       <h1 className="text-3xl font-bold">Orders</h1>
       <DataTable
-        data={orders}
+        data={filteredOrders}
         columns={columns}
         postType="Order"
+        filterComponent={statusFilterControls}
         filterColumns={["_id", "eventId"]}
+        // Inject bulk delete button into the right side controls
+        // by composing within filterComponent via an extra button
+        // (DataTable renders filterComponent under the header controls).
         onAddNew={async () => {
           const id = await createOrder({
             createdById: "seed-user",
@@ -114,6 +180,45 @@ export default function OrderPage({}: Props) {
           router.push(`/admin/orders/${String(id)}`);
         }}
       />
+      <div className="mt-2 flex justify-end">
+        <Button
+          variant="destructive"
+          onClick={async () => {
+            try {
+              // Collect selected ids from the table DOM by data-state attribute
+              // and reading the first cell which contains a Link to the order id.
+              // Since we control columns, we can also just use the orders + statusFilter.
+              const selected: string[] = [];
+              const rows = document.querySelectorAll(
+                "table tbody tr[data-state='selected']",
+              );
+              rows.forEach((tr) => {
+                const link = tr.querySelector(
+                  "a[href^='/admin/orders/']",
+                ) as HTMLAnchorElement | null;
+                const id = link
+                  ?.getAttribute("href")
+                  ?.split("/admin/orders/")[1];
+                if (id) selected.push(id);
+              });
+              if (selected.length === 0) {
+                toast({ title: "No orders selected" });
+                return;
+              }
+              await bulkDelete({ ids: selected as unknown as Array<any> });
+              toast({ title: `Deleted ${selected.length} order(s)` });
+            } catch (e) {
+              toast({
+                title: "Failed to delete",
+                description: e instanceof Error ? e.message : String(e),
+                variant: "destructive",
+              });
+            }
+          }}
+        >
+          Delete Selected
+        </Button>
+      </div>
     </div>
   );
 }
