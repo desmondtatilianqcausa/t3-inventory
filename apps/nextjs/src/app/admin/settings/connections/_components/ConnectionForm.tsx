@@ -62,6 +62,7 @@ const schema = z.object({
   ordersStatusColumnId: z.string().optional(),
   ordersEventColumnId: z.string().optional(),
   ordersCreatedByColumnId: z.string().optional(),
+  ordersPickupDropoffColumnId: z.string().optional(),
   enableOrdersSync: z.boolean().optional(),
   enableInventorySync: z.boolean().optional(),
   enableEventsSync: z.boolean().optional(),
@@ -127,6 +128,7 @@ export default function ConnectionForm({
       ordersStatusColumnId: "",
       ordersEventColumnId: "",
       ordersCreatedByColumnId: "",
+      ordersPickupDropoffColumnId: "",
     },
   });
 
@@ -259,6 +261,11 @@ export default function ConnectionForm({
             prev.ordersCreatedByColumnId ??
             "",
         ),
+        ordersPickupDropoffColumnId: String(
+          (cfg.columnMap?.ordersPickupDropoffColumnId as string | undefined) ??
+            prev.ordersPickupDropoffColumnId ??
+            "",
+        ),
       };
     });
     hasPrefilledExisting.current = true;
@@ -298,6 +305,8 @@ export default function ConnectionForm({
         ordersStatusColumnId: values.ordersStatusColumnId || undefined,
         ordersEventColumnId: values.ordersEventColumnId || undefined,
         ordersCreatedByColumnId: values.ordersCreatedByColumnId || undefined,
+        ordersPickupDropoffColumnId:
+          values.ordersPickupDropoffColumnId || undefined,
         // Store sync toggles inside columnMap to avoid strict config validators
         enableOrdersSync: !!values.enableOrdersSync,
         enableInventorySync: !!values.enableInventorySync,
@@ -421,6 +430,7 @@ export default function ConnectionForm({
   const [ordersEventOpen, setOrdersEventOpen] = useState(false);
   const [ordersCreatedByOpen, setOrdersCreatedByOpen] = useState(false);
   const [ordersSkuOpen, setOrdersSkuOpen] = useState(false);
+  const [ordersPickupOpen, setOrdersPickupOpen] = useState(false);
   const [inventoryAllCols, setInventoryAllCols] = useState<Array<Column>>([]);
   const [inventoryStatusOpen, setInventoryStatusOpen] = useState(false);
   const [ordersLoading, setOrdersLoading] = useState(false);
@@ -516,6 +526,7 @@ export default function ConnectionForm({
     form.setValue("ordersStatusColumnId", "");
     form.setValue("ordersEventColumnId", "");
     form.setValue("ordersCreatedByColumnId", "");
+    form.setValue("ordersPickupDropoffColumnId", "");
   }, [ordersBoardValue]);
 
   // Clear mapped columns when Inventory board changes to avoid stale ids
@@ -1238,6 +1249,75 @@ export default function ConnectionForm({
                                         onSelect={() => {
                                           field.onChange(c.id);
                                           setOrdersCreatedByOpen(false);
+                                        }}
+                                      >
+                                        <Check
+                                          className={cn(
+                                            "mr-2 h-4 w-4",
+                                            String(field.value ?? "") === c.id
+                                              ? "opacity-100"
+                                              : "opacity-0",
+                                          )}
+                                        />
+                                        {c.id}
+                                        {c.title ? ` — ${c.title}` : ""}
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="ordersPickupDropoffColumnId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>
+                            Orders Pickup/Dropoff Column (parent)
+                          </FormLabel>
+                          {ordersLoading && (
+                            <div className="text-xs text-muted-foreground">
+                              Loading columns…
+                            </div>
+                          )}
+                          <Popover
+                            open={ordersPickupOpen}
+                            onOpenChange={setOrdersPickupOpen}
+                          >
+                            <PopoverTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                role="combobox"
+                                className="w-full justify-between"
+                                disabled={!ordersBoardValue || ordersLoading}
+                              >
+                                {getLabelFor(field.value, ordersParentCols) ||
+                                  "Select column"}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent
+                              className="w-[400px] p-0"
+                              align="start"
+                            >
+                              <Command>
+                                <CommandInput placeholder="Search columns..." />
+                                <CommandEmpty>No columns found.</CommandEmpty>
+                                <CommandList>
+                                  <CommandGroup>
+                                    {(ordersParentCols ?? []).map((c) => (
+                                      <CommandItem
+                                        key={c.id}
+                                        value={`${c.id} ${c.title ?? ""}`}
+                                        onSelect={() => {
+                                          field.onChange(c.id);
+                                          setOrdersPickupOpen(false);
                                         }}
                                       >
                                         <Check

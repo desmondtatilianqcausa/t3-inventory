@@ -79,6 +79,9 @@ export const syncOrderToMonday = action({
     const createdByCol = String(
       (cfg.columnMap?.ordersCreatedByColumnId as string | undefined) ?? "",
     );
+    const pickupCol = String(
+      (cfg.columnMap?.ordersPickupDropoffColumnId as string | undefined) ?? "",
+    );
 
     const orderColumns: Record<string, unknown> = {};
 
@@ -120,6 +123,12 @@ export const syncOrderToMonday = action({
 
     if (createdByCol && typeof order.createdById === "string") {
       setCol(createdByCol, order.createdById);
+    }
+
+    const pickupVal = (order as { pickupDropoffLocation?: unknown })
+      .pickupDropoffLocation as string | undefined;
+    if (pickupCol && typeof pickupVal === "string" && pickupVal) {
+      setCol(pickupCol, pickupVal);
     }
 
     // Ensure a top-level Monday item exists or update it
