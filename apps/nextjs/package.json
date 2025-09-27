@@ -24,6 +24,7 @@
     "@ai-sdk/google": "^2.0.11",
     "@ai-sdk/openai": "^2.0.23",
     "@ai-sdk/react": "^2.0.30",
+    "@auth/core": "^0.37.2",
     "@convex-dev/agent": "^0.2.6",
     "@convex-dev/auth": "^0.0.88",
     "@convex-dev/resend": "^0.1.13",
@@ -59,8 +60,7 @@
     "superjson": "2.2.2",
     "three": "^0.179.1",
     "zod": "catalog:",
-    "zustand": "^5.0.8",
-    "@auth/core": "^0.37.2"
+    "zustand": "^5.0.8"
   },
   "devDependencies": {
     "@acme/eslint-config": "workspace:*",
