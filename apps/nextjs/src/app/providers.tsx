@@ -8,6 +8,7 @@ import React, {
   useState,
 } from "react";
 import { api } from "@/convex/_generated/api";
+import { ConvexAuthNextjsProvider } from "@convex-dev/auth/nextjs";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { ConvexReactClient, useMutation, useQuery } from "convex/react";
 import mondaySdk from "monday-sdk-js";
@@ -21,6 +22,7 @@ export type MondayContextValue = {
   isInMonday: boolean;
   context: unknown | null;
   sessionToken: string | null;
+  userEmail?: string | null;
 };
 
 const MondayContext = createContext<MondayContextValue | undefined>(undefined);
@@ -32,6 +34,7 @@ export function useMonday() {
       isInMonday: false,
       context: null,
       sessionToken: null,
+      userEmail: null,
     } satisfies MondayContextValue;
   return ctx;
 }
@@ -41,6 +44,7 @@ function MondayProvider({ children }: { children: React.ReactNode }) {
     isInMonday: false,
     context: null,
     sessionToken: null,
+    userEmail: null,
   });
   // Centralized mutations
   const createEvent = useMutation(api.events.mutations.create);
@@ -60,7 +64,12 @@ function MondayProvider({ children }: { children: React.ReactNode }) {
           typeof window !== "undefined" && window.self !== window.top;
         if (!inIframe) {
           if (mounted)
-            setValue({ isInMonday: false, context: null, sessionToken: null });
+            setValue({
+              isInMonday: false,
+              context: null,
+              sessionToken: null,
+              userEmail: null,
+            });
           return;
         }
         const monday = mondaySdk();
@@ -72,13 +81,33 @@ function MondayProvider({ children }: { children: React.ReactNode }) {
         );
         if (!hasKnownIds) {
           if (mounted)
-            setValue({ isInMonday: false, context: data, sessionToken: null });
+            setValue({
+              isInMonday: false,
+              context: data,
+              sessionToken: null,
+              userEmail: null,
+            });
           return;
         }
         const tokenResp = await monday.get("sessionToken").catch(() => null);
         const token = (tokenResp as any)?.data ?? null;
+
+        // Try to fetch current Monday user's email via SDK GraphQL
+        let mondayEmail: string | null = null;
+        try {
+          const meResp = await monday.api("query { me { email name } }");
+          mondayEmail = (meResp as any)?.data?.me?.email ?? null;
+        } catch {
+          mondayEmail = null;
+        }
+
         if (mounted) {
-          setValue({ isInMonday: true, context: data, sessionToken: token });
+          setValue({
+            isInMonday: true,
+            context: data,
+            sessionToken: token,
+            userEmail: mondayEmail,
+          });
         }
 
         // Subscribe to monday events and route by boardId
@@ -110,21 +139,6 @@ function MondayProvider({ children }: { children: React.ReactNode }) {
                       mondayItemId: String(it.id),
                     });
                 }
-                // Orders: create as Draft
-                // if (
-                //   value.context &&
-                //   (value.context as any).ordersBoardId &&
-                //   Number((value.context as any).ordersBoardId) === boardId
-                // ) {
-                //   await createOrder({
-                //     createdById: "monday-user",
-                //     status: "Draft",
-                //     totalQuantity: 0,
-                //     totalPrice: 0,
-                //     formResponseId: undefined,
-                //     eventId: undefined,
-                //   });
-                // }
                 // Products: create with minimal fields
                 if (
                   value.context &&
@@ -150,20 +164,6 @@ function MondayProvider({ children }: { children: React.ReactNode }) {
                 ) {
                   await removeEventByMondayId({ mondayItemId: String(it.id) });
                 }
-                if (
-                  value.context &&
-                  (value.context as any).ordersBoardId &&
-                  Number((value.context as any).ordersBoardId) === boardId
-                ) {
-                  // If we had a mondayItemId mapping for orders, we'd remove by mapping. Fallback: no-op.
-                }
-                if (
-                  value.context &&
-                  (value.context as any).inventoryBoardId &&
-                  Number((value.context as any).inventoryBoardId) === boardId
-                ) {
-                  // Similarly, remove product by monday item id if stored.
-                }
               }
             }
           } catch (e) {
@@ -172,7 +172,12 @@ function MondayProvider({ children }: { children: React.ReactNode }) {
         });
       } catch {
         if (mounted)
-          setValue({ isInMonday: false, context: null, sessionToken: null });
+          setValue({
+            isInMonday: false,
+            context: null,
+            sessionToken: null,
+            userEmail: null,
+          });
       }
     })();
     return () => {
@@ -186,13 +191,110 @@ function MondayProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Roles context
+export type RoleContextValue = {
+  roles: string[];
+  isAdmin: boolean;
+  loading: boolean;
+};
+
+const RoleContext = createContext<RoleContextValue | undefined>(undefined);
+
+export function useRoles(): RoleContextValue {
+  const ctx = useContext(RoleContext);
+  if (!ctx) return { roles: [], isAdmin: false, loading: true };
+  return ctx;
+}
+
+function RoleProvider({ children }: { children: React.ReactNode }) {
+  const { isInMonday, userEmail } = useMonday();
+  const upsertProfile = useMutation(api.users.mutations.upsertProfile);
+
+  // Use viewer when authenticated normally; otherwise, if in Monday, load by email
+  const meByAuth = useQuery(api.users.queries.viewer, {});
+  const meByEmail = useQuery(
+    api.users.queries.getByEmail,
+    userEmail ? { email: userEmail } : ("skip" as any),
+  );
+
+  // When embedded in Monday and we have an email, ensure a user row exists (and flag reset for first login)
+  useEffect(() => {
+    if (!isInMonday || !userEmail) return;
+    if (meByEmail === undefined) return; // wait for load
+    if (meByEmail === null) {
+      void upsertProfile({ email: userEmail, mustResetPassword: true });
+    }
+  }, [isInMonday, userEmail, meByEmail, upsertProfile]);
+
+  const me = meByAuth ?? meByEmail;
+
+  // If user is flagged for reset, route them to /reset
+  useEffect(() => {
+    if (!me) return;
+    const needsReset = Boolean((me as any)?.mustResetPassword);
+    if (needsReset && typeof window !== "undefined") {
+      const path = window.location.pathname;
+      if (!path.startsWith("/reset")) {
+        window.location.assign("/reset");
+      }
+    }
+  }, [me]);
+
+  // Login redirects: if user present and on / or /login, redirect to configured path for their role
+  const redirects = useQuery(api.users.queries.listLoginRedirects, {});
+  useEffect(() => {
+    if (!me || !redirects) return;
+    if (typeof window === "undefined") return;
+    const path = window.location.pathname;
+    if (path !== "/" && !path.startsWith("/login")) return;
+
+    const roles: string[] = Array.isArray((me as any)?.roles)
+      ? ((me as any).roles as string[])
+      : ["user"];
+
+    // Choose the first matching role in priority order (admin, then user)
+    const priority = [
+      "admin",
+      "user",
+      ...roles.filter((r) => r !== "admin" && r !== "user"),
+    ];
+    let dest: string | null = null;
+    for (const r of priority) {
+      const found = (redirects as Array<{ role: string; path: string }>).find(
+        (x) => x.role === r,
+      );
+      if (found?.path) {
+        dest = found.path;
+        break;
+      }
+    }
+    if (dest && dest !== path) {
+      window.location.assign(dest);
+    }
+  }, [me, redirects]);
+
+  const value = useMemo<RoleContextValue>(() => {
+    const roles = Array.isArray((me as any)?.roles)
+      ? ((me as any).roles as string[])
+      : [];
+    return {
+      roles,
+      isAdmin: roles.includes("admin"),
+      loading: me === undefined,
+    };
+  }, [me]);
+  return <RoleContext.Provider value={value}>{children}</RoleContext.Provider>;
+}
+
 function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <ConvexAuthProvider client={convex}>
+    <ConvexAuthNextjsProvider client={convex}>
       <MondayProvider>
-        <SidebarProvider>{children}</SidebarProvider>
+        <RoleProvider>
+          <SidebarProvider>{children}</SidebarProvider>
+        </RoleProvider>
       </MondayProvider>
-    </ConvexAuthProvider>
+    </ConvexAuthNextjsProvider>
   );
 }
 

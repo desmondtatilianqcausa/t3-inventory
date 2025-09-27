@@ -6,7 +6,7 @@ import { formResponses } from "./formResponses/schema";
 import { integrationConnections, integrations } from "./integrations/schema";
 import { counters, orderLineItems, orders } from "./orders/schema";
 import { productCategories, products } from "./products/schema";
-import { userRoles, users } from "./users/schema";
+import { loginRedirects, userRoles, users } from "./users/schema";
 import {
   workflow_runs,
   workflow_steps,
@@ -18,6 +18,7 @@ export default defineSchema({
   ...authTables,
   users,
   userRoles,
+  loginRedirects,
   formResponses,
   products,
   productCategories,

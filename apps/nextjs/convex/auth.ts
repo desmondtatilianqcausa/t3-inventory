@@ -1,10 +1,14 @@
+import { Password } from "@convex-dev/auth/providers/Password";
 import { convexAuth } from "@convex-dev/auth/server";
-import { query } from "./_generated/server";
 import { v } from "convex/values";
 
+import { query } from "./_generated/server";
+
+// import { ResendOTPPasswordReset } from "./ResendOTPPasswordReset";
+
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
-    providers: [],
-  });
+  providers: [Password],
+});
 
 export const hasRole = query({
   args: { role: v.string() },
@@ -19,4 +23,4 @@ export const hasRole = query({
     const roles = (user.roles as string[] | undefined) ?? [];
     return roles.includes(role);
   },
-}); 
+});

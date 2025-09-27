@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+import { api } from "@/convex/_generated/api";
+import { useQuery } from "convex/react";
 import {
   BookOpen,
   Bot,
@@ -14,6 +16,7 @@ import {
   Send,
   Settings2,
   Square,
+  Users,
   Workflow,
 } from "lucide-react";
 import { TbCloudDataConnection } from "react-icons/tb";
@@ -30,53 +33,20 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "src/app/_components/ui/sidebar";
-import { useMonday } from "src/app/providers";
+import { useMonday, useRoles } from "src/app/providers";
 
 export const navData = {
-  user: {
-    name: "shadcn",
-    email: "m@example.com",
-    avatar: "/avatars/shadcn.jpg",
-  },
   navMain: [
-    {
-      title: "Dashboard",
-      url: "/admin",
-      icon: LayoutDashboard,
-      isActive: true,
-      // items: [
-      //   {
-      //     title: "History",
-      //     url: "#",
-      //   },
-      //   {
-      //     title: "Starred",
-      //     url: "#",
-      //   },
-      //   {
-      //     title: "Settings",
-      //     url: "#",
-      //   },
-      // ],
-    },
+    // {
+    //   title: "Dashboard",
+    //   url: "/admin",
+    //   icon: LayoutDashboard,
+    //   isActive: true,
+    // },
     {
       title: "Orders",
       url: "/admin/orders",
       icon: Bot,
-      // items: [
-      //   {
-      //     title: "Genesis",
-      //     url: "#",
-      //   },
-      //   {
-      //     title: "Explorer",
-      //     url: "#",
-      //   },
-      //   {
-      //     title: "Quantum",
-      //     url: "#",
-      //   },
-      // ],
     },
     {
       title: "Products",
@@ -99,24 +69,11 @@ export const navData = {
       title: "Analytics",
       url: "/admin/analytics",
       icon: Settings2,
-      // items: [
-      //   {
-      //     title: "General",
-      //     url: "#",
-      //   },
-      //   {
-      //     title: "Team",
-      //     url: "#",
-      //   },
-      //   {
-      //     title: "Billing",
-      //     url: "#",
-      //   },
-      //   {
-      //     title: "Limits",
-      //     url: "#",
-      //   },
-      // ],
+    },
+    {
+      title: "Users",
+      url: "/admin/users",
+      icon: Users,
     },
     {
       title: "Settings",
@@ -141,41 +98,42 @@ export const navData = {
       ],
     },
   ],
-  // navSecondary: [
-  //   {
-  //     title: "Support",
-  //     url: "#",
-  //     icon: LifeBuoy,
-  //   },
-  //   {
-  //     title: "Feedback",
-  //     url: "#",
-  //     icon: Send,
-  //   },
-  // ],
-  // projects: [
-  //   {
-  //     name: "Design Engineering",
-  //     url: "#",
-  //     icon: Frame,
-  //   },
-  //   {
-  //     name: "Sales & Marketing",
-  //     url: "#",
-  //     icon: PieChart,
-  //   },
-  //   {
-  //     name: "Travel",
-  //     url: "#",
-  //     icon: Map,
-  //   },
-  // ],
-};
+} as const;
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { isInMonday } = useMonday();
-  console.log("isInMonday", isInMonday);
   if (isInMonday) return null;
+  const { isAdmin } = useRoles();
+
+  const viewer = useQuery(api.users.queries.viewer, {});
+  console.log("viewer", viewer);
+
+  const user = {
+    firstName: (viewer as { firstName?: string } | null)?.firstName ?? "User",
+    lastName: (viewer as { lastName?: string } | null)?.lastName ?? "",
+    email: (viewer as { email?: string } | null)?.email ?? "",
+    avatar:
+      (viewer as { pictureUrl?: string } | null)?.pictureUrl ??
+      "/avatars/shadcn.jpg",
+  };
+
+  // Clone navMain into a mutable array to satisfy NavMain prop typing
+  const navItems = React.useMemo(
+    () => navData.navMain.map((i) => ({ ...i })),
+    [],
+  );
+
+  // Role-based filtering: non-admins see only Orders, Products, Events
+  const filteredNavItems = React.useMemo(() => {
+    if (isAdmin) return navItems;
+    const allow = new Set([
+      "/admin/orders",
+      "/admin/products",
+      "/admin/events",
+    ]);
+    return navItems.filter((item) => allow.has(item.url));
+  }, [isAdmin, navItems]);
+
   return (
     <Sidebar variant="inset" {...props}>
       <SidebarHeader>
@@ -197,12 +155,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={navData.navMain} />
-        {/* <NavProjects projects={data.projects} />
-        <NavSecondary items={data.navSecondary} className="mt-auto" /> */}
+        <NavMain items={filteredNavItems as any} />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={navData.user} />
+        <NavUser user={user} />
       </SidebarFooter>
     </Sidebar>
   );

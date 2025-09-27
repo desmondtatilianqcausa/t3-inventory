@@ -1,5 +1,6 @@
-import { mutation } from "../_generated/server";
 import { v } from "convex/values";
+
+import { mutation } from "../_generated/server";
 
 export const upsertProfile = mutation({
   args: {
@@ -8,6 +9,7 @@ export const upsertProfile = mutation({
     lastName: v.optional(v.string()),
     tel: v.optional(v.string()),
     roles: v.optional(v.array(v.string())),
+    mustResetPassword: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db
@@ -19,7 +21,9 @@ export const upsertProfile = mutation({
         firstName: args.firstName,
         lastName: args.lastName,
         tel: args.tel,
-        roles: args.roles,
+        roles: args.roles ?? existing.roles,
+        mustResetPassword:
+          args.mustResetPassword ?? existing.mustResetPassword ?? false,
       });
       return existing._id;
     }
@@ -28,7 +32,45 @@ export const upsertProfile = mutation({
       firstName: args.firstName,
       lastName: args.lastName,
       tel: args.tel,
-      roles: args.roles ?? [],
+      roles: args.roles ?? ["user"],
+      mustResetPassword: args.mustResetPassword ?? false,
     });
+  },
+});
+
+export const setRoles = mutation({
+  args: { id: v.id("users"), roles: v.array(v.string()) },
+  handler: async (ctx, { id, roles }) => {
+    await ctx.db.patch(id, { roles });
+    return null;
+  },
+});
+
+export const clearMustResetPasswordByEmail = mutation({
+  args: { email: v.string() },
+  handler: async (ctx, { email }) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", email))
+      .first();
+    if (user) {
+      await ctx.db.patch(user._id, { mustResetPassword: false });
+    }
+    return null;
+  },
+});
+
+export const upsertLoginRedirect = mutation({
+  args: { role: v.string(), path: v.string() },
+  handler: async (ctx, { role, path }) => {
+    const existing = await ctx.db
+      .query("loginRedirects")
+      .withIndex("by_role", (q) => q.eq("role", role))
+      .first();
+    if (existing) {
+      await ctx.db.patch(existing._id, { path });
+      return existing._id;
+    }
+    return await ctx.db.insert("loginRedirects", { role, path });
   },
 });

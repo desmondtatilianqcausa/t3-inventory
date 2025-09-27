@@ -7,6 +7,7 @@ export const users = defineTable({
   email: v.string(),
   tel: v.optional(v.string()),
   roles: v.optional(v.array(v.string())),
+  mustResetPassword: v.optional(v.boolean()),
 }).index("by_email", ["email"]);
 
 export const userRoles = defineTable({
@@ -15,3 +16,8 @@ export const userRoles = defineTable({
 })
   .index("by_user", ["userId"])
   .index("by_role", ["role"]);
+
+export const loginRedirects = defineTable({
+  role: v.string(),
+  path: v.string(),
+}).index("by_role", ["role"]);
