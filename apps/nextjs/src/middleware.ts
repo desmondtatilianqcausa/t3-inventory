@@ -8,11 +8,18 @@ const isSignInPage = createRouteMatcher(["/login"]);
 const isProtectedRoute = createRouteMatcher(["/admin(.*)"]);
 
 export default convexAuthNextjsMiddleware(async (request, { convexAuth }) => {
+  const inIframe = request.headers.get("sec-fetch-dest") === "iframe";
   if (isSignInPage(request) && (await convexAuth.isAuthenticated())) {
     return nextjsMiddlewareRedirect(request, "/admin");
   }
-  if (isProtectedRoute(request) && !(await convexAuth.isAuthenticated())) {
-    return nextjsMiddlewareRedirect(request, "/login");
+  if (isProtectedRoute(request)) {
+    if (inIframe) {
+      // Allow embedded contexts (e.g., Monday) to load; client code handles access control
+      return;
+    }
+    if (!(await convexAuth.isAuthenticated())) {
+      return nextjsMiddlewareRedirect(request, "/login");
+    }
   }
 });
 

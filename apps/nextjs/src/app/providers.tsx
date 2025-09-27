@@ -10,7 +10,12 @@ import React, {
 import { api } from "@/convex/_generated/api";
 import { ConvexAuthNextjsProvider } from "@convex-dev/auth/nextjs";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
-import { ConvexReactClient, useMutation, useQuery } from "convex/react";
+import {
+  ConvexReactClient,
+  useConvexAuth,
+  useMutation,
+  useQuery,
+} from "convex/react";
 import mondaySdk from "monday-sdk-js";
 
 import { SidebarProvider } from "./_components/ui/sidebar";
@@ -209,6 +214,7 @@ export function useRoles(): RoleContextValue {
 function RoleProvider({ children }: { children: React.ReactNode }) {
   const { isInMonday, userEmail } = useMonday();
   const upsertProfile = useMutation(api.users.mutations.upsertProfile);
+  const { isAuthenticated } = useConvexAuth();
 
   // Use viewer when authenticated normally; otherwise, if in Monday, load by email
   const meByAuth = useQuery(api.users.queries.viewer, {});
@@ -240,9 +246,10 @@ function RoleProvider({ children }: { children: React.ReactNode }) {
     }
   }, [me]);
 
-  // Login redirects: if user present and on / or /login, redirect to configured path for their role
+  // Login redirects: only after Convex auth is established
   const redirects = useQuery(api.users.queries.listLoginRedirects, {});
   useEffect(() => {
+    if (!isAuthenticated) return; // avoid loops when not signed in with Convex
     if (!me || !redirects) return;
     if (typeof window === "undefined") return;
     const path = window.location.pathname;
@@ -252,7 +259,6 @@ function RoleProvider({ children }: { children: React.ReactNode }) {
       ? ((me as any).roles as string[])
       : ["user"];
 
-    // Choose the first matching role in priority order (admin, then user)
     const priority = [
       "admin",
       "user",
@@ -271,7 +277,7 @@ function RoleProvider({ children }: { children: React.ReactNode }) {
     if (dest && dest !== path) {
       window.location.assign(dest);
     }
-  }, [me, redirects]);
+  }, [isAuthenticated, me, redirects]);
 
   const value = useMemo<RoleContextValue>(() => {
     const roles = Array.isArray((me as any)?.roles)
