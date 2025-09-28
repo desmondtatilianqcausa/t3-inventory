@@ -11,7 +11,9 @@ import React, {
   useState,
 } from "react";
 import { api } from "@/convex/_generated/api";
-import { useAuthActions } from "@convex-dev/auth/react";
+import { ConvexAuthNextjsProvider } from "@convex-dev/auth/nextjs";
+import { ConvexAuthProvider, useAuthActions } from "@convex-dev/auth/react";
+import * as ConvexAuthReact from "@convex-dev/auth/react";
 import {
   ConvexProviderWithAuth,
   ConvexReactClient,
@@ -27,6 +29,7 @@ const convex = new ConvexReactClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 function useAuthFromMonday() {
   const { isInMonday, userEmail } = useMonday();
+  // Always declare hooks in the same order; guard inside the handler instead of early-returning
   const tokenCacheRef = useRef<{
     token: string | null;
     expiresAt: number;
@@ -34,6 +37,7 @@ function useAuthFromMonday() {
 
   const fetchAccessToken = useCallback(
     async ({ forceRefreshToken }: { forceRefreshToken: boolean }) => {
+      if (!isInMonday || !userEmail) return null;
       const now = Date.now();
       const cached = tokenCacheRef.current;
       if (
@@ -45,7 +49,6 @@ function useAuthFromMonday() {
         console.log("[MONDAY AUTH] using cached token");
         return cached.token;
       }
-      if (!userEmail) return null;
       try {
         const base = "https://beloved-pony-177.convex.site";
         console.log("[MONDAY AUTH] issuing token", { base });
@@ -72,13 +75,47 @@ function useAuthFromMonday() {
         return null;
       }
     },
-    [userEmail],
+    [isInMonday, userEmail],
   );
 
   const isAuthed = !!userEmail && isInMonday;
+  console.log("[MONDAY AUTH] isAuthed", isAuthed);
   return useMemo(
     () => ({ isLoading: false, isAuthenticated: isAuthed, fetchAccessToken }),
     [isAuthed, fetchAccessToken],
+  );
+}
+
+// Password auth shim from @convex-dev/auth/react
+function usePasswordAuth() {
+  const hook = (ConvexAuthReact as any).useAuth as
+    | (() => {
+        isLoading: boolean;
+        isAuthenticated: boolean;
+        fetchAccessToken: (o: {
+          forceRefreshToken: boolean;
+        }) => Promise<string | null>;
+      })
+    | undefined;
+  if (hook) return hook();
+  return {
+    isLoading: false,
+    isAuthenticated: false,
+    fetchAccessToken: async () => null,
+  };
+}
+
+function useMergedAuth() {
+  const mondayAuth = useAuthFromMonday();
+  const passwordAuth = usePasswordAuth();
+  const useWhich = mondayAuth.isAuthenticated ? mondayAuth : passwordAuth;
+  return useMemo(
+    () => ({
+      isLoading: useWhich.isLoading,
+      isAuthenticated: useWhich.isAuthenticated,
+      fetchAccessToken: useWhich.fetchAccessToken,
+    }),
+    [useWhich.isLoading, useWhich.isAuthenticated, useWhich.fetchAccessToken],
   );
 }
 
@@ -340,12 +377,14 @@ function RoleProvider({ children }: { children: React.ReactNode }) {
 function Providers({ children }: { children: React.ReactNode }) {
   return (
     <MondayContextProvider>
-      <ConvexProviderWithAuth client={convex} useAuth={useAuthFromMonday}>
-        <MondayConvexEffects />
-        <RoleProvider>
-          <SidebarProvider>{children}</SidebarProvider>
-        </RoleProvider>
-      </ConvexProviderWithAuth>
+      <ConvexAuthNextjsProvider client={convex}>
+        <ConvexProviderWithAuth client={convex} useAuth={useMergedAuth}>
+          <MondayConvexEffects />
+          <RoleProvider>
+            <SidebarProvider>{children}</SidebarProvider>
+          </RoleProvider>
+        </ConvexProviderWithAuth>
+      </ConvexAuthNextjsProvider>
     </MondayContextProvider>
   );
 }

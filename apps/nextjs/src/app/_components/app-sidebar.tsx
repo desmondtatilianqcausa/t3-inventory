@@ -108,6 +108,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const viewer = useQuery(api.users.queries.viewer, {});
   console.log("viewer", viewer);
 
+  const user2 = useQuery(api.users.queries.getCurrentUser, {});
+  console.log("user2", user2);
+
   const user = {
     firstName: (viewer as { firstName?: string } | null)?.firstName ?? "User",
     lastName: (viewer as { lastName?: string } | null)?.lastName ?? "",
@@ -158,7 +161,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavMain items={filteredNavItems as any} />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={user} />
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <NavUser user={user} />
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
   );

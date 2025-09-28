@@ -22,7 +22,7 @@ export type SelectableProduct = {
   _id: string;
   name: string;
   price: number;
-  quantity: number;
+  stock: number;
   productCategoryId?: string;
 };
 
@@ -64,42 +64,81 @@ export default function OrderLineItemForm({
         header: () => <span>Select</span>,
         cell: ({ row }) => {
           const id = row.original._id;
+          const stock = Number(row.original.stock ?? 0);
           const qty = selected[id] ?? 0;
+          const disabled = stock <= 0;
           return (
             <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={qty > 0}
-                onChange={(e) =>
-                  setSelected((prev) => ({
-                    ...prev,
-                    [id]: e.target.checked ? (prev[id] ?? 1) : 0,
-                  }))
-                }
-              />
-              <Input
-                type="number"
-                className="w-20"
-                value={qty || 0}
-                min={0}
-                onChange={(e) =>
-                  setSelected((prev) => ({
-                    ...prev,
-                    [id]: Math.max(0, parseInt(e.target.value || "0")),
-                  }))
-                }
-              />
+              {disabled ? (
+                <span className="text-xs font-medium text-red-600">
+                  Out of stock
+                </span>
+              ) : (
+                <>
+                  <input
+                    type="checkbox"
+                    checked={qty > 0}
+                    disabled={disabled}
+                    aria-disabled={disabled}
+                    title={disabled ? "Out of stock" : undefined}
+                    onChange={(e) =>
+                      setSelected((prev) => ({
+                        ...prev,
+                        [id]: e.target.checked
+                          ? Math.max(1, Math.min(prev[id] ?? 1, stock))
+                          : 0,
+                      }))
+                    }
+                  />
+                  <div className="flex flex-col items-center">
+                    <Input
+                      type="number"
+                      className="mb-32! w-24"
+                      value={qty || 0}
+                      min={qty > 0 ? 1 : 0}
+                      max={stock}
+                      disabled={disabled}
+                      aria-disabled={disabled}
+                      onChange={(e) => {
+                        const raw = parseInt(e.target.value || "0");
+                        const clamped = Math.max(
+                          0,
+                          Math.min(isNaN(raw) ? 0 : raw, stock),
+                        );
+                        setSelected((prev) => ({ ...prev, [id]: clamped }));
+                      }}
+                    />
+                    <span className="text-xs text-muted-foreground">
+                      max {stock}
+                    </span>
+                  </div>
+                </>
+              )}
+              {/* {disabled ? (
+                <span className="text-xs font-medium text-red-600">
+                  Out of stock
+                </span>
+              ) : null} */}
             </div>
           );
         },
       },
-      { accessorKey: "name", header: "Name" },
+      {
+        accessorKey: "name",
+        header: "Name",
+        meta: { headerClassName: "w-full" },
+      },
       {
         accessorKey: "price",
         header: "Price",
         cell: ({ row }) => <>${row.original.price}</>,
+        meta: { headerClassName: "min-w-24" },
       },
-      { accessorKey: "stock", header: "Stock" },
+      {
+        accessorKey: "stock",
+        header: "Stock",
+        meta: { headerClassName: "min-w-24" },
+      },
     ],
     [selected],
   );
@@ -155,7 +194,10 @@ export default function OrderLineItemForm({
           columns={columns}
           postType="Product"
           showAddButton={false}
-          showCustomizeColumns={false}
+          showCustomizeColumns={true}
+          initialColumnVisibility={{
+            price: false,
+          }}
         />
       </CardContent>
     </Card>

@@ -1,5 +1,6 @@
 import { httpRouter } from "convex/server";
 
+import { api } from "./_generated/api";
 import { httpAction } from "./_generated/server";
 
 const http = httpRouter();
@@ -103,8 +104,13 @@ http.route({
         });
       const issuer = process.env.CONVEX_SITE_URL!;
       const aud = process.env.NEXT_CONVEX_OIDC_AUD ?? issuer;
+      // Ensure a user exists for this email and get its user id
+      const userId = await ctx.runMutation(api.users.mutations.upsertProfile, {
+        email,
+      });
       const { signJwt } = await import("./lib/jwt");
-      const token = await signJwt(email, issuer, aud, 10 * 60, { email });
+      // Set subject to the Convex users doc id to align with password auth
+      const token = await signJwt(String(userId), issuer, aud, 10 * 60);
       console.log("[CONVEX OIDC] token issued", { aud, issuer });
       return new Response(JSON.stringify({ token }), {
         headers: { "Content-Type": "application/json", ...corsHeaders },

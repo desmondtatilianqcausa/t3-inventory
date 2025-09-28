@@ -69,6 +69,7 @@ export function DataTable<TData>({
   isLoading = false,
   skeletonRows = 5,
   filterComponent,
+  initialColumnVisibility,
 }: {
   title?: string;
   titleSize?: "lg" | "xl" | "2xl" | "3xl";
@@ -85,13 +86,14 @@ export function DataTable<TData>({
   isLoading?: boolean;
   skeletonRows?: number;
   filterComponent?: React.ReactNode;
+  initialColumnVisibility?: VisibilityState;
 }) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     [],
   );
   const [columnVisibility, setColumnVisibility] =
-    React.useState<VisibilityState>({});
+    React.useState<VisibilityState>(initialColumnVisibility ?? {});
   const [rowSelection, setRowSelection] = React.useState({});
 
   const table = useReactTable({

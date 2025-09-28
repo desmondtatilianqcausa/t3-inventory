@@ -17,14 +17,16 @@ export const upsertProfile = mutation({
       .withIndex("by_email", (q) => q.eq("email", args.email))
       .first();
     if (existing) {
-      await ctx.db.patch(existing._id, {
-        firstName: args.firstName,
-        lastName: args.lastName,
-        tel: args.tel,
-        roles: args.roles ?? existing.roles,
-        mustResetPassword:
-          args.mustResetPassword ?? existing.mustResetPassword ?? false,
-      });
+      const patch: Record<string, unknown> = {};
+      if (args.firstName !== undefined) patch.firstName = args.firstName;
+      if (args.lastName !== undefined) patch.lastName = args.lastName;
+      if (args.tel !== undefined) patch.tel = args.tel;
+      if (args.roles !== undefined) patch.roles = args.roles;
+      if (args.mustResetPassword !== undefined)
+        patch.mustResetPassword = args.mustResetPassword;
+      if (Object.keys(patch).length > 0) {
+        await ctx.db.patch(existing._id, patch as any);
+      }
       return existing._id;
     }
     return await ctx.db.insert("users", {

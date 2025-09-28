@@ -1,15 +1,29 @@
 "use client";
 
 import React from "react";
+import { api } from "@/convex/_generated/api";
+import { useQuery } from "convex/react";
 import { Separator } from "src/app/_components/ui/separator";
 import { SidebarTrigger } from "src/app/_components/ui/sidebar";
 
 import { navData } from "./app-sidebar";
 import { NavMain } from "./nav-main";
+import { NavUser } from "./nav-user";
 
 export function SiteHeader() {
   const [rightActions, setRightActions] = React.useState<React.ReactNode>(null);
   const [leftActions, setLeftActions] = React.useState<React.ReactNode>(null);
+  const viewer = useQuery(api.users.queries.viewer, {});
+  console.log("viewer", viewer);
+
+  const user = {
+    firstName: (viewer as { firstName?: string } | null)?.firstName ?? "User",
+    lastName: (viewer as { lastName?: string } | null)?.lastName ?? "",
+    email: (viewer as { email?: string } | null)?.email ?? "",
+    avatar:
+      (viewer as { pictureUrl?: string } | null)?.pictureUrl ??
+      "/avatars/shadcn.jpg",
+  };
 
   React.useEffect(() => {
     function handle(e: CustomEvent) {
@@ -50,9 +64,12 @@ export function SiteHeader() {
           orientation="vertical"
           className="mx-2 data-[orientation=vertical]:h-4"
         />
-        {/* <NavMain items={navData.navMain} /> */}
-        <div className="flex items-center gap-2">{leftActions}</div>
-        <div className="ml-auto flex items-center gap-2">{rightActions}</div>
+        <div className="flex flex-1">
+          {/* <NavMain items={navData.navMain} /> */}
+          <div className="flex items-center gap-2">{leftActions}</div>
+          <div className="mr-auto flex items-center gap-2">{rightActions}</div>
+          <NavUser className="w-auto min-w-48" user={user} side="bottom" />
+        </div>
       </div>
     </header>
   );

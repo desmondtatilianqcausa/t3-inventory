@@ -221,6 +221,21 @@ export const setLineItems = mutation({
   handler: async (ctx, { orderId, items }) => {
     const now = Date.now();
 
+    // Validate stock constraints before mutating
+    for (const item of items) {
+      const product = await ctx.db.get(item.productId);
+      const currentStock =
+        typeof product?.stock === "number" ? product.stock : 0;
+      if (item.quantity > currentStock) {
+        throw new Error(
+          `Insufficient stock for product ${String(item.productId)}. Requested ${item.quantity}, available ${currentStock}.`,
+        );
+      }
+      if (item.quantity < 0) {
+        throw new Error("Quantity cannot be negative");
+      }
+    }
+
     // Remove existing line items for this order
     const existing = await ctx.db
       .query("orderLineItems")
@@ -340,6 +355,18 @@ export const checkout = mutation({
       .query("orderLineItems")
       .withIndex("by_order", (q) => q.eq("orderId", id))
       .collect();
+
+    // Validate stock one more time at checkout to avoid race conditions
+    for (const li of items) {
+      const product = await ctx.db.get(li.productId);
+      const currentStock =
+        typeof product?.stock === "number" ? product.stock : 0;
+      if (li.quantity > currentStock) {
+        throw new Error(
+          `Insufficient stock for product ${String(li.productId)}. Requested ${li.quantity}, available ${currentStock}.`,
+        );
+      }
+    }
 
     // Update product inventory in Convex first
     for (const li of items) {
