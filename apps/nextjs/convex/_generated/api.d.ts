@@ -20,6 +20,7 @@ import type * as http from "../http.js";
 import type * as init from "../init.js";
 import type * as integrations_mutations from "../integrations/mutations.js";
 import type * as integrations_queries from "../integrations/queries.js";
+import type * as lib_jwt from "../lib/jwt.js";
 import type * as migration from "../migration.js";
 import type * as monday_actions from "../monday/actions.js";
 import type * as monday_internal from "../monday/internal.js";
@@ -73,6 +74,7 @@ declare const fullApi: ApiFromModules<{
   init: typeof init;
   "integrations/mutations": typeof integrations_mutations;
   "integrations/queries": typeof integrations_queries;
+  "lib/jwt": typeof lib_jwt;
   migration: typeof migration;
   "monday/actions": typeof monday_actions;
   "monday/internal": typeof monday_internal;

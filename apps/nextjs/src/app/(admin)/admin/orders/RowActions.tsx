@@ -1,5 +1,10 @@
 "use client";
 
+import type { Doc, Id } from "@/convex/_generated/dataModel";
+import React, { forwardRef, useImperativeHandle, useState } from "react";
+import { api } from "@/convex/_generated/api";
+import { useMutation } from "convex/react";
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -9,56 +14,49 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "~/app/_components/ui/alert-dialog";
-import type { Doc, Id } from "@/convex/_generated/dataModel";
-import {
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-} from "~/app/_components/ui/dropdown-menu";
 
-import { Button } from "~/app/_components/ui/button";
-import { api } from "@/convex/_generated/api";
-import { useMutation } from "convex/react";
-import { useState } from "react";
+export type RowActionsHandle = {
+  openDialog: () => void;
+};
 
-export default function RowActions({ order }: { order: Doc<"orders"> }) {
-  const remove = useMutation(api.orders.mutations.remove);
-  const [open, setOpen] = useState(false);
+const RowActions = forwardRef<RowActionsHandle, { order: Doc<"orders"> }>(
+  ({ order }, ref) => {
+    const remove = useMutation(api.orders.mutations.remove);
+    const [open, setOpen] = useState(false);
 
-  const handleConfirm = async () => {
-    await remove({ id: order._id as Id<"orders"> });
-    setOpen(false);
-  };
+    useImperativeHandle(ref, () => ({ openDialog: () => setOpen(true) }));
 
-  return (
-    <AlertDialog open={open} onOpenChange={setOpen}>
-      <AlertDialogTrigger asChild>
-        <DropdownMenuItem
-          onSelect={(e) => e.preventDefault()}
-          className="text-red-600"
-        >
-          Delete order
-        </DropdownMenuItem>
-      </AlertDialogTrigger>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Delete this order?</AlertDialogTitle>
-          <AlertDialogDescription>
-            This action cannot be undone. This will permanently delete the order
-            and its line items.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={handleConfirm}
-            className="bg-red-600 hover:bg-red-500"
-          >
-            Delete
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  );
-}
+    const handleConfirm = async () => {
+      setOpen(false);
+      await remove({ id: order._id as Id<"orders"> });
+    };
+
+    return (
+      <AlertDialog open={open} onOpenChange={setOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this order?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the
+              order and its line items.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirm}
+              className="bg-red-600 hover:bg-red-500"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    );
+  },
+);
+
+RowActions.displayName = "RowActions";
+
+export default RowActions;

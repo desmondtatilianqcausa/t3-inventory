@@ -772,7 +772,7 @@ export default function OrderForm({ orderId }: { orderId?: string }) {
                     name="eventId"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-xl font-bold">
+                        <FormLabel className="text-lg font-bold">
                           Event (required)
                         </FormLabel>
                         <Popover
@@ -868,7 +868,7 @@ export default function OrderForm({ orderId }: { orderId?: string }) {
                     name="pickupDropoffLocation"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-xl font-bold">
+                        <FormLabel className="text-lg font-bold">
                           Pickup/Dropoff Location
                         </FormLabel>
                         <Select
@@ -898,7 +898,7 @@ export default function OrderForm({ orderId }: { orderId?: string }) {
                 <div className="space-y-2">
                   <DataTable
                     title="Line Items"
-                    titleSize="xl"
+                    titleSize="lg"
                     data={tableRows}
                     columns={columns}
                     postType="Item"
@@ -966,7 +966,7 @@ export default function OrderForm({ orderId }: { orderId?: string }) {
             {/* Actions Card */}
             <Card>
               <CardHeader>
-                <CardTitle>Actions</CardTitle>
+                <CardTitle className="text-xl font-bold">Actions</CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col gap-3">
                 <FormField<OrderFormValues>
@@ -1103,7 +1103,7 @@ export default function OrderForm({ orderId }: { orderId?: string }) {
             {/* Users Card */}
             <Card className="mt-6">
               <CardHeader>
-                <CardTitle>Users</CardTitle>
+                <CardTitle className="text-xl font-bold">Created By</CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col gap-3">
                 {/* Hidden form value for createdById to keep backend contract */}
@@ -1139,7 +1139,9 @@ export default function OrderForm({ orderId }: { orderId?: string }) {
             {/* Extra Fields Card */}
             <Card className="mt-6">
               <CardHeader>
-                <CardTitle>Extra Fields</CardTitle>
+                <CardTitle className="text-xl font-bold">
+                  Extra Fields
+                </CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col gap-3">
                 <FormField

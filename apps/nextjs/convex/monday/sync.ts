@@ -95,7 +95,7 @@ export const syncOrderToMonday = action({
           orderColumns[colId] = { label: value };
         }
       } else if (t === "email") {
-        if (typeof value === "string" && value) {
+        if (typeof value === "string" && value && value.includes("@")) {
           orderColumns[colId] = { email: value, text: value };
         }
       } else if (t === "text" || t === "long_text") {
@@ -121,8 +121,21 @@ export const syncOrderToMonday = action({
       } catch {}
     }
 
-    if (createdByCol && typeof order.createdById === "string") {
-      setCol(createdByCol, order.createdById);
+    if (createdByCol) {
+      // Prefer viewer email; fallback to order.createdById if it looks like an email; else skip
+      try {
+        const me = await ctx.runQuery(api.users.queries.viewer, {});
+        const email = (me as { email?: unknown } | null)?.email;
+        if (typeof email === "string" && email.includes("@")) {
+          setCol(createdByCol, email);
+        } else if (
+          typeof (order as { createdById?: unknown }).createdById ===
+            "string" &&
+          String((order as { createdById?: unknown }).createdById).includes("@")
+        ) {
+          setCol(createdByCol, String((order as any).createdById));
+        }
+      } catch {}
     }
 
     const pickupVal = (order as { pickupDropoffLocation?: unknown })

@@ -1,8 +1,11 @@
 "use client";
 
+import React, { useRef } from "react";
 import Link from "next/link";
+import { api } from "@/convex/_generated/api";
 import { type Doc } from "@/convex/_generated/dataModel";
 import { type ColumnDef } from "@tanstack/react-table";
+import { useQuery } from "convex/react";
 import { ArrowUpDown, MoreHorizontal } from "lucide-react";
 
 import { Badge } from "~/app/_components/ui/badge";
@@ -17,7 +20,7 @@ import {
   DropdownMenuTrigger,
 } from "~/app/_components/ui/dropdown-menu";
 import { useMonday } from "~/app/providers";
-import RowActions from "./RowActions";
+import RowActions, { RowActionsHandle } from "./RowActions";
 
 type Order = Doc<"orders">;
 
@@ -25,6 +28,14 @@ type EventNameMap = Record<string, string>;
 
 export const createColumns = (eventNames: EventNameMap): ColumnDef<Order>[] => {
   const { isInMonday } = useMonday();
+  const users = useQuery(api.users.queries.listAll, {});
+  const idToEmail = React.useMemo(() => {
+    const m = new Map<string, string>();
+    for (const u of (users as any[]) ?? []) {
+      if (u?._id) m.set(String(u._id), String(u.email ?? ""));
+    }
+    return m;
+  }, [users]);
 
   return [
     {
@@ -82,14 +93,15 @@ export const createColumns = (eventNames: EventNameMap): ColumnDef<Order>[] => {
       },
     },
     {
-      accessorKey: "customerId",
+      accessorKey: "createdById",
       header: "Created By",
       cell: ({ row }) => {
-        const order = row.original;
-        return <div>{order.createdById}</div>;
+        const id = String(row.original.createdById ?? "");
+        const email = idToEmail.get(id);
+        return <div>{email ?? id}</div>;
       },
       meta: {
-        headerClassName: "min-w-28",
+        headerClassName: "min-w-48",
       },
     },
     {
@@ -142,32 +154,49 @@ export const createColumns = (eventNames: EventNameMap): ColumnDef<Order>[] => {
       enableHiding: false,
       cell: ({ row }) => {
         const order = row.original;
+        const [menuOpen, setMenuOpen] = React.useState(false);
+        const dialogRef = useRef<RowActionsHandle>(null);
         return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 p-0">
-                <span className="sr-only">Open menu</span>
-                <MoreHorizontal />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem
-                onClick={() =>
-                  navigator.clipboard.writeText(order._id as unknown as string)
-                }
-              >
-                Copy order ID
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link href={`/admin/orders/${String(order._id)}`}>
-                  View details
-                </Link>
-              </DropdownMenuItem>
-              <RowActions order={order} />
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <>
+            <RowActions ref={dialogRef} order={order} />
+            <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="h-8 w-8 p-0">
+                  <span className="sr-only">Open menu</span>
+                  <MoreHorizontal />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                <DropdownMenuItem
+                  onClick={() =>
+                    navigator.clipboard.writeText(
+                      order._id as unknown as string,
+                    )
+                  }
+                >
+                  Copy order ID
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href={`/admin/orders/${String(order._id)}`}>
+                    View details
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    setMenuOpen(false);
+                    // delay opening dialog until menu closes to avoid focus conflicts
+                    setTimeout(() => dialogRef.current?.openDialog(), 0);
+                  }}
+                  className="text-red-600"
+                >
+                  Delete order
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
         );
       },
       meta: {

@@ -22,9 +22,13 @@ export const getByEmail = query({
 export const viewer = query({
   args: {},
   handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
-    console.log("userId", userId);
-    return userId !== null ? ctx.db.get(userId) : null;
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity?.email) return null;
+    const row = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", identity.email!))
+      .first();
+    return row ?? null;
   },
 });
 
