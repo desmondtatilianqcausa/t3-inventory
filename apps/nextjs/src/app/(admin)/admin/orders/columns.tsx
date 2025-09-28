@@ -6,7 +6,7 @@ import { api } from "@/convex/_generated/api";
 import { type Doc } from "@/convex/_generated/dataModel";
 import { type ColumnDef } from "@tanstack/react-table";
 import { useQuery } from "convex/react";
-import { ArrowUpDown, MoreHorizontal } from "lucide-react";
+import { ArrowUpDown, Delete, MoreHorizontal } from "lucide-react";
 
 import { Badge } from "~/app/_components/ui/badge";
 import { Button } from "~/app/_components/ui/button";
@@ -19,6 +19,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "~/app/_components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "~/app/_components/ui/tooltip";
 import { useMonday } from "~/app/providers";
 import RowActions, { RowActionsHandle } from "./RowActions";
 
@@ -156,6 +162,7 @@ export const createColumns = (eventNames: EventNameMap): ColumnDef<Order>[] => {
         const order = row.original;
         const [menuOpen, setMenuOpen] = React.useState(false);
         const dialogRef = useRef<RowActionsHandle>(null);
+        const canDelete = (order.status ?? "Draft") === "Draft";
         return (
           <>
             <RowActions ref={dialogRef} order={order} />
@@ -184,14 +191,21 @@ export const createColumns = (eventNames: EventNameMap): ColumnDef<Order>[] => {
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem
+                  disabled={!canDelete}
                   onSelect={(e) => {
+                    if (!canDelete) return;
                     e.preventDefault();
                     setMenuOpen(false);
                     // delay opening dialog until menu closes to avoid focus conflicts
                     setTimeout(() => dialogRef.current?.openDialog(), 0);
                   }}
-                  className="text-red-600"
+                  className={
+                    !canDelete
+                      ? "pointer-events-none opacity-50"
+                      : "text-red-600"
+                  }
                 >
+                  <Delete />
                   Delete order
                 </DropdownMenuItem>
               </DropdownMenuContent>

@@ -309,6 +309,11 @@ export const remove = mutation({
   args: { id: v.id("orders") },
   returns: v.null(),
   handler: async (ctx, { id }) => {
+    const order = await ctx.db.get(id);
+    if (!order) return null;
+    if (order.status && order.status !== "Draft") {
+      throw new Error("Only Draft orders can be deleted");
+    }
     // Delete line items first
     const items = await ctx.db
       .query("orderLineItems")
@@ -477,6 +482,11 @@ export const bulkDelete = mutation({
   returns: v.null(),
   handler: async (ctx, { ids }) => {
     for (const id of ids) {
+      const order = await ctx.db.get(id);
+      if (!order) continue;
+      if (order.status && order.status !== "Draft") {
+        throw new Error("Only Draft orders can be deleted");
+      }
       const items = await ctx.db
         .query("orderLineItems")
         .withIndex("by_order", (q) => q.eq("orderId", id))
