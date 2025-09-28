@@ -6,11 +6,12 @@ import { useQuery } from "convex/react";
 import { Separator } from "src/app/_components/ui/separator";
 import { SidebarTrigger } from "src/app/_components/ui/sidebar";
 
+import { cn } from "~/lib/utils";
 import { navData } from "./app-sidebar";
 import { NavMain } from "./nav-main";
 import { NavUser } from "./nav-user";
 
-export function SiteHeader() {
+export function SiteHeader({ className }: { className?: string }) {
   const [rightActions, setRightActions] = React.useState<React.ReactNode>(null);
   const [leftActions, setLeftActions] = React.useState<React.ReactNode>(null);
   const viewer = useQuery(api.users.queries.viewer, {});
@@ -57,7 +58,12 @@ export function SiteHeader() {
   }, []);
 
   return (
-    <header className="group-has-data-[collapsible=icon]/sidebar-wrapper:h-14 flex h-14 shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear">
+    <header
+      className={cn(
+        "group-has-data-[collapsible=icon]/sidebar-wrapper:h-14 flex h-14 shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear",
+        className,
+      )}
+    >
       <div className="flex w-full items-center gap-1 px-[30px] lg:gap-2">
         <SidebarTrigger className="-ml-1" />
         <Separator
@@ -67,7 +73,9 @@ export function SiteHeader() {
         <div className="flex flex-1">
           {/* <NavMain items={navData.navMain} /> */}
           <div className="flex items-center gap-2">{leftActions}</div>
-          <div className="mr-auto flex items-center gap-2">{rightActions}</div>
+          <div className="ml-auto mr-4 flex items-center gap-2">
+            {rightActions}
+          </div>
           <NavUser className="w-auto min-w-48" user={user} side="bottom" />
         </div>
       </div>

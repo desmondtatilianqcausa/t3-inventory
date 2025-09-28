@@ -46,6 +46,7 @@ import { useMonday } from "src/app/providers";
 
 import { useToast } from "~/app/_components/ui/use-toast";
 import { cn } from "~/lib/utils";
+import { Button } from "./ui/button";
 
 export function NavUser({
   user,
@@ -138,10 +139,13 @@ export function NavUser({
           <DropdownMenuItem asChild>
             <AlertDialog open={open} onOpenChange={setOpen}>
               <AlertDialogTrigger asChild>
-                <button className="flex w-full items-center gap-2">
+                <Button
+                  className="flex h-auto w-full items-center justify-start gap-2 text-xs font-black"
+                  variant="ghost"
+                >
                   <LogOut />
                   Log out
-                </button>
+                </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>

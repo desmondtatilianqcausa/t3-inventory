@@ -40,7 +40,7 @@ export default async function RootLayout({
     <>
       <AppSidebar variant="inset" />
       <SidebarInset>
-        <SiteHeader />
+        <SiteHeader className="sticky top-0 z-10 bg-white" />
         <div className="flex flex-1 flex-col">
           <div className="@container/main container flex flex-1 flex-col gap-2 py-4">
             {children}
