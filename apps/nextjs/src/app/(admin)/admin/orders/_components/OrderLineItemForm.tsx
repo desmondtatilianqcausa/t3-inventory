@@ -198,6 +198,7 @@ export default function OrderLineItemForm({
           initialColumnVisibility={{
             price: false,
           }}
+          getRowId={(row) => row._id}
         />
       </CardContent>
     </Card>

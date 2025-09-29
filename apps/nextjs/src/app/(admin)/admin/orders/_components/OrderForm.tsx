@@ -757,7 +757,7 @@ export default function OrderForm({ orderId }: { orderId?: string }) {
         <div className="grid grid-cols-12 gap-6">
           <div className="col-span-12 lg:col-span-9">
             <Card>
-              <div className="sticky top-0 z-10 bg-white">
+              <div className="sticky top-14 z-10 bg-white">
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>
                     Order # <span>{order?.orderNumber}</span>

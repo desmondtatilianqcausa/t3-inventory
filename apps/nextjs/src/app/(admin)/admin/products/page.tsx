@@ -1,17 +1,17 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from "~/app/_components/ui/toggle-group";
+import { useRouter } from "next/navigation";
+import { api } from "@/convex/_generated/api";
 import { useMutation, useQuery } from "convex/react";
 
 import { DataTable } from "~/app/_components/Table";
 import { Spinner } from "~/app/_components/ui/loading-spinner";
-import { api } from "@/convex/_generated/api";
+import {
+  ToggleGroup,
+  ToggleGroupItem,
+} from "~/app/_components/ui/toggle-group";
 import { getColumns } from "./columns";
-import { useRouter } from "next/navigation";
 
 function ProductsPage() {
   const router = useRouter();
@@ -107,6 +107,8 @@ function ProductsPage() {
       )}
       columns={getColumns(categoryIdToName)}
       postType="Product"
+      showTextFilter={true}
+      filterColumns={["name", "description"]}
       filterComponent={filterUi}
       onAddNew={handleAddProduct}
     />

@@ -70,6 +70,7 @@ export function DataTable<TData>({
   skeletonRows = 5,
   filterComponent,
   initialColumnVisibility,
+  getRowId,
 }: {
   title?: string;
   titleSize?: "lg" | "xl" | "2xl" | "3xl";
@@ -87,6 +88,7 @@ export function DataTable<TData>({
   skeletonRows?: number;
   filterComponent?: React.ReactNode;
   initialColumnVisibility?: VisibilityState;
+  getRowId?: (row: TData, index: number) => string;
 }) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
@@ -107,6 +109,14 @@ export function DataTable<TData>({
     getFilteredRowModel: getFilteredRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
+    getRowId: getRowId
+      ? (row, index) => getRowId(row as TData, index)
+      : undefined,
+    initialState: {
+      pagination: {
+        pageSize: 20,
+      },
+    },
     state: {
       sorting,
       columnFilters,

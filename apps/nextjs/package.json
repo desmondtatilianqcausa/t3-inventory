@@ -7,7 +7,7 @@
     "convex dev": "convex dev --run init",
     "build": "pnpm with-env next build",
     "clean": "git clean -xdf .cache .next .turbo node_modules",
-    "dev": "pnpm with-env next dev --turbopack",
+    "dev": "pnpm with-env next dev -p 3001 --turbopack",
     "predev": "convex dev --until-success --run init",
     "format": "prettier --check . --ignore-path ../../.gitignore",
     "lint": "eslint",
