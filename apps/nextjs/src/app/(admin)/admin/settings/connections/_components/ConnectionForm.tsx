@@ -1,23 +1,12 @@
 "use client";
 
-import type { Id } from "@/convex/_generated/dataModel";
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { api } from "@/convex/_generated/api";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useAction, useMutation, useQuery } from "convex/react";
-import { Check, ChevronsUpDown } from "lucide-react";
-import { useForm } from "react-hook-form";
-import { cn } from "src/lib/utils";
-import { z } from "zod";
-
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "~/app/_components/ui/accordion";
-import { Button } from "~/app/_components/ui/button";
-import { Checkbox } from "~/app/_components/ui/checkbox";
+import { Check, ChevronsUpDown } from "lucide-react";
 import {
   Command,
   CommandEmpty,
@@ -34,13 +23,24 @@ import {
   FormLabel,
   FormMessage,
 } from "~/app/_components/ui/form";
-import { Input } from "~/app/_components/ui/input";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "~/app/_components/ui/popover";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useAction, useMutation, useQuery } from "convex/react";
+
+import { Button } from "~/app/_components/ui/button";
+import { Checkbox } from "~/app/_components/ui/checkbox";
+import type { Id } from "@/convex/_generated/dataModel";
+import { Input } from "~/app/_components/ui/input";
+import { api } from "@/convex/_generated/api";
+import { cn } from "src/lib/utils";
+import { useForm } from "react-hook-form";
 import { useToast } from "~/app/_components/ui/use-toast";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 
 const schema = z.object({
   name: z.string().min(2, "Name is required"),
@@ -66,6 +66,7 @@ const schema = z.object({
   enableOrdersSync: z.boolean().optional(),
   enableInventorySync: z.boolean().optional(),
   enableEventsSync: z.boolean().optional(),
+  inventoryImageFileColumnId: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -129,6 +130,7 @@ export default function ConnectionForm({
       ordersEventColumnId: "",
       ordersCreatedByColumnId: "",
       ordersPickupDropoffColumnId: "",
+      inventoryImageFileColumnId: "",
     },
   });
 
@@ -266,6 +268,11 @@ export default function ConnectionForm({
             prev.ordersPickupDropoffColumnId ??
             "",
         ),
+        inventoryImageFileColumnId: String(
+          (cfg.columnMap?.inventoryImageFileColumnId as string | undefined) ??
+            prev.inventoryImageFileColumnId ??
+            "",
+        ),
       };
     });
     hasPrefilledExisting.current = true;
@@ -307,6 +314,8 @@ export default function ConnectionForm({
         ordersCreatedByColumnId: values.ordersCreatedByColumnId || undefined,
         ordersPickupDropoffColumnId:
           values.ordersPickupDropoffColumnId || undefined,
+        inventoryImageFileColumnId:
+          values.inventoryImageFileColumnId || undefined,
         // Store sync toggles inside columnMap to avoid strict config validators
         enableOrdersSync: !!values.enableOrdersSync,
         enableInventorySync: !!values.enableInventorySync,
@@ -1718,6 +1727,77 @@ export default function ConnectionForm({
                                             field.onChange(c.id);
                                             setInventoryStatusOpen(false);
                                           }}
+                                        >
+                                          <Check
+                                            className={cn(
+                                              "mr-2 h-4 w-4",
+                                              String(field.value ?? "") === c.id
+                                                ? "opacity-100"
+                                                : "opacity-0",
+                                            )}
+                                          />
+                                          {c.id}
+                                          {c.title ? ` — ${c.title}` : ""}
+                                        </CommandItem>
+                                      ))}
+                                    </CommandGroup>
+                                  </CommandList>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="inventoryImageFileColumnId"
+                      render={({ field }) => {
+                        const fileCols = (inventoryAllCols ?? []).filter(
+                          (c) => (c.type ?? "").toLowerCase() === "file",
+                        );
+                        const options = fileCols.length
+                          ? fileCols
+                          : inventoryAllCols;
+                        return (
+                          <FormItem>
+                            <FormLabel>Inventory Image File Column</FormLabel>
+                            {inventoryLoading && (
+                              <div className="text-xs text-muted-foreground">
+                                Loading columns…
+                              </div>
+                            )}
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  role="combobox"
+                                  className="w-full justify-between"
+                                  disabled={
+                                    !inventoryBoardValue || inventoryLoading
+                                  }
+                                >
+                                  {getLabelFor(field.value, options) ||
+                                    "Select column"}
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent
+                                className="w-[400px] p-0"
+                                align="start"
+                              >
+                                <Command>
+                                  <CommandInput placeholder="Search columns..." />
+                                  <CommandEmpty>No columns found.</CommandEmpty>
+                                  <CommandList>
+                                    <CommandGroup>
+                                      {(options ?? []).map((c) => (
+                                        <CommandItem
+                                          key={c.id}
+                                          value={`${c.id} ${c.title ?? ""}`}
+                                          onSelect={() => field.onChange(c.id)}
                                         >
                                           <Check
                                             className={cn(

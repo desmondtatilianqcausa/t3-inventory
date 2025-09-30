@@ -1,22 +1,24 @@
 "use client";
 
-import type { Id } from "@/convex/_generated/dataModel";
-import type { ColumnDef } from "@tanstack/react-table";
 import * as React from "react";
-import { useMemo, useState } from "react";
-import { api } from "@/convex/_generated/api";
-import { useQuery } from "convex/react";
 
-import { DataTable } from "~/app/_components/Table";
-import { Button } from "~/app/_components/ui/button";
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from "~/app/_components/ui/card";
+import { useMemo, useState } from "react";
+
+import { Button } from "~/app/_components/ui/button";
+import type { ColumnDef } from "@tanstack/react-table";
+import { DataTable } from "~/app/_components/Table";
+import type { Id } from "@/convex/_generated/dataModel";
 import { Input } from "~/app/_components/ui/input";
+import { LazyMondayImage } from "~/app/_components/LazyMondayImage";
 import { Separator } from "~/app/_components/ui/separator";
+import { api } from "@/convex/_generated/api";
+import { useQuery } from "convex/react";
 
 export type SelectableProduct = {
   _id: string;
@@ -126,6 +128,12 @@ export default function OrderLineItemForm({
       {
         accessorKey: "name",
         header: "Name",
+        cell: ({ row }) => (
+          <div className="flex items-center gap-3">
+            <LazyMondayImage productId={row.original._id as string} />
+            <span>{row.original.name}</span>
+          </div>
+        ),
         meta: { headerClassName: "w-full" },
       },
       {

@@ -49,9 +49,12 @@ export const update = mutation({
     status: v.optional(v.string()), // Draft | Published | Removed
     checkedOut: v.optional(v.number()),
     restockTrigger: v.optional(v.number()),
+    featuredImageUrl: v.optional(v.string()),
+    featuredImageUrlExpiresAt: v.optional(v.number()),
   },
   returns: v.null(),
   handler: async (ctx, { id, ...rest }) => {
+    console.log("[MONDAY] update product", { id, ...rest });
     const existing = await ctx.db.get(id);
     await ctx.db.patch(id, { ...rest });
 

@@ -9,6 +9,7 @@ export const products = defineTable({
   productCategoryId: v.union(v.id("productCategories"), v.null()),
   featuredImageId: v.optional(v.id("_storage")),
   featuredImageUrl: v.optional(v.string()),
+  featuredImageUrlExpiresAt: v.optional(v.number()),
   mondayItemId: v.optional(v.number()),
   // Added fields to match CSV columns
   stock: v.optional(v.number()),

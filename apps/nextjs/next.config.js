@@ -1,5 +1,5 @@
-import path from "path";
 import { createJiti } from "jiti";
+import path from "path";
 
 const jiti = createJiti(import.meta.url);
 
@@ -42,6 +42,10 @@ const config = {
       {
         protocol: "https",
         hostname: "*.monday.com",
+      },
+      {
+        protocol: "https",
+        hostname: "files-monday-com.s3.amazonaws.com",
       },
     ],
   },

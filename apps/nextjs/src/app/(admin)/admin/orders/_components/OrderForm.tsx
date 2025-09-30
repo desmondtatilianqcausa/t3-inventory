@@ -1,17 +1,5 @@
 "use client";
 
-import type { Id } from "@/convex/_generated/dataModel";
-import type { ColumnDef } from "@tanstack/react-table";
-import { useEffect, useMemo, useRef, useState } from "react";
-import Image from "next/image";
-import { useRouter } from "next/navigation";
-import { api } from "@/convex/_generated/api";
-import { useMutation, useQuery } from "convex/react";
-import { Check, ChevronsUpDown } from "lucide-react";
-import { useFieldArray, useForm } from "react-hook-form";
-import { cn } from "src/lib/utils";
-
-import { DataTable } from "~/app/_components/Table";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,13 +16,13 @@ import {
   AvatarFallback,
   AvatarImage,
 } from "~/app/_components/ui/avatar";
-import { Button } from "~/app/_components/ui/button";
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from "~/app/_components/ui/card";
+import { Check, ChevronsUpDown } from "lucide-react";
 import {
   Command,
   CommandEmpty,
@@ -58,8 +46,6 @@ import {
   FormLabel,
   FormMessage,
 } from "~/app/_components/ui/form";
-import { Input } from "~/app/_components/ui/input";
-import { Spinner } from "~/app/_components/ui/loading-spinner";
 import {
   Popover,
   PopoverContent,
@@ -74,9 +60,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/app/_components/ui/select";
-import { Separator } from "~/app/_components/ui/separator";
-import { useToast } from "~/app/_components/ui/use-toast";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useFieldArray, useForm } from "react-hook-form";
+import { useMutation, useQuery } from "convex/react";
+
+import { Button } from "~/app/_components/ui/button";
+import type { ColumnDef } from "@tanstack/react-table";
+import { DataTable } from "~/app/_components/Table";
+import type { Id } from "@/convex/_generated/dataModel";
+import Image from "next/image";
+import { Input } from "~/app/_components/ui/input";
+import { LazyMondayImage } from "~/app/_components/LazyMondayImage";
 import OrderLineItemForm from "./OrderLineItemForm";
+import { Separator } from "~/app/_components/ui/separator";
+import { Spinner } from "~/app/_components/ui/loading-spinner";
+import { api } from "@/convex/_generated/api";
+import { cn } from "src/lib/utils";
+import { useRouter } from "next/navigation";
+import { useToast } from "~/app/_components/ui/use-toast";
 
 // helper formatters for events (group by month only)
 const monthKeyOf = (d: Date) => `${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -476,24 +477,7 @@ export default function OrderForm({ orderId }: { orderId?: string }) {
         console.log("[OrderForm] original", original);
         return (
           <div className="flex items-center gap-3">
-            {row.original.featuredImage ? (
-              <button
-                type="button"
-                className="shrink-0"
-                onClick={() => openImage(row.original.featuredImage)}
-                aria-label="View image"
-              >
-                <Image
-                  src={row.original.featuredImage}
-                  alt=""
-                  className="h-10 w-10 rounded border object-cover"
-                  width={40}
-                  height={40}
-                />
-              </button>
-            ) : (
-              <div className="h-10 w-10 rounded border bg-muted" />
-            )}
+            <LazyMondayImage productId={row.original.productId} />
             <div className="capitalize">{row.original.name}</div>
           </div>
         );

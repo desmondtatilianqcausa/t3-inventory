@@ -777,3 +777,38 @@ export const getItemWithColumns = action({
     };
   },
 });
+
+export const getItemFilePublicUrl = action({
+  args: {
+    config: v.object({ apiToken: v.string() }),
+    itemId: v.string(),
+    fileColumnId: v.string(),
+  },
+  returns: v.union(v.string(), v.null()),
+  handler: async (ctx, { config, itemId, fileColumnId }) => {
+    const q = `query ($ids: [ID!]!, $columnIds: [String!]) {
+      items(ids: $ids) {
+        id
+        column_values(ids: $columnIds) { id text value }
+        assets { id public_url }
+      }
+    }`;
+    const r = (await withRetry(() =>
+      callMonday(
+        q,
+        { ids: [String(itemId)], columnIds: [fileColumnId] },
+        config.apiToken,
+      ),
+    )) as {
+      data?: {
+        items?: Array<{
+          id?: string;
+          assets?: Array<{ id?: string; public_url?: string | null }>;
+        }>;
+      };
+    };
+    const it = (r?.data?.items ?? [])[0];
+    const first = (it?.assets ?? []).find((a) => !!a?.public_url)?.public_url;
+    return typeof first === "string" ? first : null;
+  },
+});

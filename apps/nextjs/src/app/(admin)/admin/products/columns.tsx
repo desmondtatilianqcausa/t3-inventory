@@ -4,6 +4,7 @@ import { type Doc } from "@/convex/_generated/dataModel";
 import { type ColumnDef } from "@tanstack/react-table";
 import { ArrowUpDown, MoreHorizontal } from "lucide-react";
 
+import { LazyMondayImage } from "~/app/_components/LazyMondayImage";
 import { Button } from "~/app/_components/ui/button";
 import { Checkbox } from "~/app/_components/ui/checkbox";
 import {
@@ -73,17 +74,7 @@ export function getColumns(
             href={`/admin/products/${p._id as unknown as string}`}
             className="flex items-center gap-3"
           >
-            {url ? (
-              <Image
-                src={url}
-                alt=""
-                className="h-10 w-10 rounded border object-cover"
-                width={40}
-                height={40}
-              />
-            ) : (
-              <div className="h-10 w-10 rounded border bg-muted" />
-            )}
+            <LazyMondayImage productId={p._id as unknown as string} />
             <span className="font-medium">{p.name}</span>
           </Link>
         );
