@@ -1,9 +1,9 @@
 "use node";
 
-import { v } from "convex/values";
-
 import { api, internal } from "../_generated/api";
+
 import { action } from "../_generated/server";
+import { v } from "convex/values";
 
 export const syncProductsForOrder = action({
   args: { orderId: v.id("orders") },
@@ -378,6 +378,111 @@ export const pullInventoryBoard = action({
           mondayItemId: Number(it.id),
         });
       }
+    }
+
+    return null;
+  },
+});
+
+export const pullInventoryItem = action({
+  args: { itemId: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { itemId }) => {
+    // Resolve connection & config
+    const integration = await ctx.runQuery(api.integrations.queries.getByKind, {
+      kind: "monday",
+    });
+    if (!integration) return null;
+    const connections = await ctx.runQuery(
+      api.integrations.queries.listConnections,
+      { integrationId: integration._id },
+    );
+    if ((connections ?? []).length === 0) return null;
+    const conn = (connections ?? [])[0];
+    const cfg = (conn?.config ?? {}) as {
+      apiToken?: string;
+      inventoryBoardId?: number;
+      columnMap?: Record<string, unknown>;
+      enableInventorySync?: boolean;
+    };
+    if (!((cfg.enableInventorySync as boolean | undefined) ?? true))
+      return null;
+    if (!cfg.apiToken || typeof cfg.inventoryBoardId !== "number") return null;
+
+    // Fetch the item with columns
+    const item = await ctx.runAction(api.monday.actions.getItemWithColumns, {
+      config: { apiToken: cfg.apiToken },
+      itemId,
+    });
+
+    // Map category by group id
+    const existingCategories = await ctx.runQuery(
+      api.products.queries.getAllCategories,
+      {},
+    );
+    let productCategoryId: any = undefined;
+    if (item.groupId) {
+      for (const c of existingCategories ?? []) {
+        if ((c as any).mondayGroupId === item.groupId) {
+          productCategoryId = (c as any)._id;
+          break;
+        }
+      }
+    }
+
+    // Build column id map
+    const colMap = (cfg.columnMap ?? {}) as Record<string, string>;
+    const stockCol = String(colMap.inventoryStockColumnId ?? "");
+    const checkedOutCol = String(colMap.inventoryCheckedOutColumnId ?? "");
+    const restockTriggerCol = String(
+      colMap.inventoryRestockTriggerColumnId ?? "",
+    );
+    const statusCol = String(colMap.inventoryStatusColumnId ?? "");
+
+    // Helpers
+    const getNum = (id: string) => {
+      if (!id) return undefined;
+      const c = item.columns.find((x) => x.id === id);
+      const n = c?.text ? Number(c.text.replace(/,/g, "")) : undefined;
+      return Number.isFinite(n) ? (n as number) : undefined;
+    };
+    const getStatus = (id: string) => {
+      if (!id) return undefined;
+      const c = item.columns.find((x) => x.id === id);
+      return c?.text ? String(c.text) : undefined;
+    };
+
+    // Find product by mondayItemId
+    const mondayItemIdNum = Number(item.id);
+    const found = (await ctx.runQuery(api.products.queries.getByMondayItemId, {
+      mondayItemId: mondayItemIdNum,
+    })) as any;
+
+    // Upsert
+    if (found) {
+      await ctx.runMutation(api.products.mutations.update, {
+        id: found._id,
+        name: item.name ?? found.name,
+        stock: getNum(stockCol),
+        checkedOut: getNum(checkedOutCol) as any,
+        restockTrigger: getNum(restockTriggerCol) as any,
+        status: getStatus(statusCol) as any,
+        productCategoryId,
+      } as any);
+    } else {
+      const newId = await ctx.runMutation(api.products.mutations.create, {
+        name: String(item.name ?? `Product ${item.id}`),
+        description: undefined,
+        stock: getNum(stockCol) ?? 0,
+        price: 0,
+        status: (getStatus(statusCol) as any) ?? "Draft",
+        category: undefined,
+        productCategoryId,
+      });
+      await ctx.runMutation(api.products.mutations.setMondayItemId, {
+        id: newId,
+        mondayItemId: mondayItemIdNum,
+      });
     }
 
     return null;

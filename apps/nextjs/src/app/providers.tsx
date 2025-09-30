@@ -17,6 +17,7 @@ import * as ConvexAuthReact from "@convex-dev/auth/react";
 import {
   ConvexProviderWithAuth,
   ConvexReactClient,
+  useAction,
   useConvexAuth,
   useMutation,
   useQuery,
@@ -252,10 +253,24 @@ function MondayConvexEffects() {
     api.events.mutations.removeByMondayItemId,
   );
   const createProduct = useMutation(api.products.mutations.create);
+  const updateEventByMondayId = useMutation(
+    api.events.mutations.updateByMondayItemId,
+  );
+  const updateProductByMondayId = useMutation(
+    api.products.mutations.updateByMondayItemId,
+  );
+  const pullInventoryItem = useAction(
+    api.monday.inventorySync.pullInventoryItem,
+  );
+  const defaultConn = useQuery(
+    api.integrations.queries.getDefaultMondayConnection,
+    {},
+  );
 
   useEffect(() => {
     if (!context) return;
     const unsubscribe = monday.listen("events", async (res: any) => {
+      console.log("[MONDAY] events", res);
       try {
         if (!res?.type) return;
         const ids: string[] = (res?.data?.itemIds ?? []).map((x: number) =>
@@ -265,13 +280,23 @@ function MondayConvexEffects() {
         const q = `query ($ids: [ID!]!) { items(ids: $ids) { id name board { id } } }`;
         const r = await monday.api(q, { variables: { ids } });
         const items = r?.data?.items ?? [];
+        console.log("[MONDAY] events items", items);
         for (const it of items) {
           const boardId = Number(it?.board?.id);
           const name = (it?.name ?? "").trim();
+          const cfg = (defaultConn?.config ?? {}) as {
+            eventsBoardId?: number;
+            inventoryBoardId?: number;
+          };
+          const eventsBoardId = cfg?.eventsBoardId;
+          const inventoryBoardId = cfg?.inventoryBoardId;
           if (res.type === "new_items") {
+            console.log("[MONDAY] events new items", { name });
+            console.log("[MONDAY] events context", context);
+            console.log("[MONDAY] events boardId", boardId);
             if (
-              (context as any).eventsBoardId &&
-              Number((context as any).eventsBoardId) === boardId
+              typeof eventsBoardId === "number" &&
+              eventsBoardId === boardId
             ) {
               if (name)
                 await createEvent({
@@ -281,24 +306,55 @@ function MondayConvexEffects() {
                 });
             }
             if (
-              (context as any).inventoryBoardId &&
-              Number((context as any).inventoryBoardId) === boardId
+              typeof inventoryBoardId === "number" &&
+              inventoryBoardId === boardId
             ) {
-              if (name)
-                await createProduct({
-                  name,
-                  description: undefined,
-                  stock: 0,
-                  price: 0,
-                  status: "Draft" as any,
-                  category: undefined,
-                  productCategoryId: undefined,
-                });
+              console.log("[MONDAY] events create product", { name });
+              if (name) console.log("[MONDAY] creating product", { name });
+              await createProduct({
+                name,
+                description: undefined,
+                stock: 0,
+                price: 0,
+                status: "Draft" as any,
+                category: undefined,
+                productCategoryId: undefined,
+                mondayItemId: Number(it.id),
+              });
+            }
+          } else if (res.type === "change_column_values") {
+            // Handle name/title changes pushed from Monday
+            console.log("[MONDAY] events change column values", { name });
+            if (name) {
+              if (
+                typeof eventsBoardId === "number" &&
+                eventsBoardId === boardId
+              ) {
+                try {
+                  await updateEventByMondayId({
+                    mondayItemId: String(it.id),
+                    title: name,
+                  });
+                } catch (e) {
+                  console.error("update event by monday id error", e);
+                }
+              }
+              if (
+                typeof inventoryBoardId === "number" &&
+                inventoryBoardId === boardId
+              ) {
+                try {
+                  // Prefer server-side pull from Monday using mapped columns
+                  await pullInventoryItem({ itemId: String(it.id) });
+                } catch (e) {
+                  // We'll rely on pull sync for name updates if we can't resolve here
+                }
+              }
             }
           } else if (res.type === "delete_items") {
             if (
-              (context as any).eventsBoardId &&
-              Number((context as any).eventsBoardId) === boardId
+              typeof eventsBoardId === "number" &&
+              eventsBoardId === boardId
             ) {
               await removeEventByMondayId({ mondayItemId: String(it.id) });
             }
@@ -315,7 +371,16 @@ function MondayConvexEffects() {
         if (typeof unsubscribe === "function") unsubscribe();
       } catch {}
     };
-  }, [context, createEvent, removeEventByMondayId, createProduct, monday]);
+  }, [
+    context,
+    createEvent,
+    removeEventByMondayId,
+    createProduct,
+    monday,
+    defaultConn,
+    pullInventoryItem,
+    updateEventByMondayId,
+  ]);
 
   return null;
 }

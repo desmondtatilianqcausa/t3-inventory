@@ -1,9 +1,9 @@
-import type { FunctionReference } from "convex/server";
-import { v } from "convex/values";
-
 import { api, internal } from "../_generated/api";
+
+import type { FunctionReference } from "convex/server";
 import { mutation } from "../_generated/server";
 import { slugify } from "../events/helpers";
+import { v } from "convex/values";
 
 export const create = mutation({
   args: {
@@ -47,6 +47,8 @@ export const update = mutation({
     category: v.optional(v.string()),
     productCategoryId: v.optional(v.id("productCategories")),
     status: v.optional(v.string()), // Draft | Published | Removed
+    checkedOut: v.optional(v.number()),
+    restockTrigger: v.optional(v.number()),
   },
   returns: v.null(),
   handler: async (ctx, { id, ...rest }) => {
@@ -223,6 +225,22 @@ export const setMondayItemId = mutation({
   returns: v.null(),
   handler: async (ctx, { id, mondayItemId }) => {
     await ctx.db.patch(id, { mondayItemId });
+    return null;
+  },
+});
+
+export const updateByMondayItemId = mutation({
+  args: { mondayItemId: v.number(), name: v.optional(v.string()) },
+  returns: v.null(),
+  handler: async (ctx, { mondayItemId, name }) => {
+    const prod = await ctx.db
+      .query("products")
+      .withIndex("by_mondayItemId", (q) => q.eq("mondayItemId", mondayItemId))
+      .first();
+    if (!prod) return null;
+    const patch: Record<string, unknown> = {};
+    if (name !== undefined) patch.name = name;
+    await ctx.db.patch(prod._id, patch);
     return null;
   },
 });

@@ -41,3 +41,12 @@ export const getCategoryById = query({
   args: { id: v.id("productCategories") },
   handler: async (ctx, { id }) => ctx.db.get(id),
 });
+
+export const getByMondayItemId = query({
+  args: { mondayItemId: v.number() },
+  handler: async (ctx, { mondayItemId }) =>
+    ctx.db
+      .query("products")
+      .withIndex("by_mondayItemId", (q) => q.eq("mondayItemId", mondayItemId))
+      .first(),
+});

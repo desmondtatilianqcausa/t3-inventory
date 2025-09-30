@@ -1,8 +1,7 @@
 "use node";
 
-import { v } from "convex/values";
-
 import { action } from "../_generated/server";
+import { v } from "convex/values";
 
 type MondayConfig = {
   apiToken: string;
@@ -292,8 +291,8 @@ export const listBoardItemsWithColumns = action({
               group?: { id?: string };
               column_values?: Array<{
                 id?: string;
-                text?: string;
-                value?: string;
+                text?: string | null;
+                value?: string | null;
               }>;
             }>;
           };
@@ -309,11 +308,12 @@ export const listBoardItemsWithColumns = action({
         groupId: it?.group?.id ? String(it.group.id) : undefined,
         columns: (it?.column_values ?? [])
           .filter((c) => !!c?.id)
-          .map((c) => ({
-            id: String(c?.id ?? ""),
-            text: c?.text,
-            value: c?.value,
-          })),
+          .map((c) => {
+            const obj: Record<string, unknown> = { id: String(c?.id ?? "") };
+            if (typeof c?.text === "string") obj.text = c.text;
+            if (typeof c?.value === "string") obj.value = c.value;
+            return obj as { id: string; text?: string; value?: string };
+          }),
       }));
   },
 });
@@ -724,5 +724,56 @@ export const listBoardColumns = action({
         title: c?.title,
         type: c?.type,
       }));
+  },
+});
+
+export const getItemWithColumns = action({
+  args: { config: v.object({ apiToken: v.string() }), itemId: v.string() },
+  returns: v.object({
+    id: v.string(),
+    name: v.optional(v.string()),
+    groupId: v.optional(v.string()),
+    columns: v.array(
+      v.object({
+        id: v.string(),
+        text: v.optional(v.string()),
+        value: v.optional(v.string()),
+      }),
+    ),
+  }),
+  handler: async (ctx, { config, itemId }) => {
+    const q = `query ($ids: [ID!]!) {
+      items(ids: $ids) { id name group { id } column_values { id text value } }
+    }`;
+    const r = (await withRetry(() =>
+      callMonday(q, { ids: [String(itemId)] }, config.apiToken),
+    )) as {
+      data?: {
+        items?: Array<{
+          id?: string;
+          name?: string;
+          group?: { id?: string };
+          column_values?: Array<{
+            id?: string;
+            text?: string | null;
+            value?: string | null;
+          }>;
+        }>;
+      };
+    };
+    const it = (r?.data?.items ?? [])[0];
+    return {
+      id: String(it?.id ?? ""),
+      name: it?.name,
+      groupId: it?.group?.id ? String(it.group.id) : undefined,
+      columns: (it?.column_values ?? [])
+        .filter((c) => !!c?.id)
+        .map((c) => {
+          const obj: Record<string, unknown> = { id: String(c?.id ?? "") };
+          if (typeof c?.text === "string") obj.text = c.text;
+          if (typeof c?.value === "string") obj.value = c.value;
+          return obj as { id: string; text?: string; value?: string };
+        }),
+    };
   },
 });

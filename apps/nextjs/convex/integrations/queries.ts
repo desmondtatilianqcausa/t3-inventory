@@ -40,3 +40,31 @@ export const listAllConnections = query({
     return await ctx.db.query("integrationConnections").order("desc").collect();
   },
 });
+
+export const getDefaultMondayConnection = query({
+  args: {},
+  returns: v.union(
+    v.object({
+      _id: v.id("integrationConnections"),
+      config: v.any(),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx) => {
+    const integration = await ctx.db
+      .query("integrations")
+      .withIndex("by_kind", (q) => q.eq("kind", "monday"))
+      .first();
+    if (!integration) return null;
+    const conns = await ctx.db
+      .query("integrationConnections")
+      .withIndex("by_integration", (q) =>
+        q.eq("integrationId", integration._id),
+      )
+      .collect();
+    if (!conns.length) return null;
+    const preferred =
+      conns.find((c) => (c.config as any)?.isDefault) ?? conns[0];
+    return { _id: preferred._id, config: preferred.config } as any;
+  },
+});

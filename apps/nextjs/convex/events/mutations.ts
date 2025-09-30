@@ -1,7 +1,6 @@
-import { v } from "convex/values";
-
 import { mutation } from "../_generated/server";
 import { slugify } from "./helpers";
+import { v } from "convex/values";
 
 const baseEventArgs = {
   title: v.string(),
@@ -105,6 +104,22 @@ export const update = mutation({
         : {}),
       updatedAt: now,
     });
+    return null;
+  },
+});
+
+export const updateByMondayItemId = mutation({
+  args: { mondayItemId: v.string(), title: v.optional(v.string()) },
+  returns: v.null(),
+  handler: async (ctx, { mondayItemId, title }) => {
+    const ev = await ctx.db
+      .query("events")
+      .withIndex("by_mondayItemId", (q) => q.eq("mondayItemId", mondayItemId))
+      .first();
+    if (!ev) return null;
+    const patch: Record<string, unknown> = { updatedAt: Date.now() };
+    if (title !== undefined) patch.title = title;
+    await ctx.db.patch(ev._id, patch);
     return null;
   },
 });
